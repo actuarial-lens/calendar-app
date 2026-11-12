@@ -1,0 +1,25 @@
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
+        ctx = await b.new_context(viewport={'width':390,'height':844}, is_mobile=True, has_touch=True, locale='zh-TW', timezone_id='Asia/Taipei')
+        page = await ctx.new_page(); errs=[]; page.on('pageerror', lambda e: errs.append(str(e)))
+        await page.goto('http://localhost:4173/?demo=1'); await page.wait_for_selector('.card')
+        await page.locator('.btn-new').click(); await page.wait_for_selector('.sheet'); await page.wait_for_timeout(500)
+        await page.fill('#ed-title','選日期測試')
+        await page.locator('.date-chip').first.click(); await page.wait_for_selector('.cal-sheet'); await page.wait_for_timeout(500)
+        print('月曆標題:', await page.locator('.cal-sheet .sheet-title').inner_text(), '| 疊在編輯面板上:', await page.locator('.overlay').count())
+        await page.locator('.cal-sheet .cal-nav').nth(1).click(); await page.wait_for_timeout(100)
+        await page.locator('.cal-day', has_text='20').first.click(); await page.wait_for_timeout(600)
+        print('選了之後:', await page.locator('.date-chip').first.inner_text(), '| 月曆已關:', await page.locator('.cal-sheet').count()==0, '| 編輯面板仍在:', await page.locator('.sheet').count())
+        await page.locator('.chip', has_text='每週').click()
+        await page.locator('.date-chip').nth(1).click(); await page.wait_for_selector('.cal-sheet'); await page.wait_for_timeout(500)
+        print('結束日：早於開始日的不能選:', await page.locator('.cal-sheet .cal-day:disabled').count() > 0)
+        await page.locator('.cal-sheet .cal-nav').nth(1).click(); await page.wait_for_timeout(100)
+        await page.locator('.cal-sheet .cal-day:not(:disabled)', has_text='15').first.click(); await page.wait_for_timeout(600)
+        print('結束日 chip:', await page.locator('.date-chip').nth(1).inner_text(), '| 提示:', await page.locator('.field-hint').inner_text())
+        await page.locator('.btn-primary').click(); await page.wait_for_timeout(700)
+        print('儲存後 toast:', (await page.locator('.toast').inner_text()).split('\n')[0], '錯誤', errs)
+        await b.close()
+asyncio.run(main())

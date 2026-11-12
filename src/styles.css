@@ -1,0 +1,515 @@
+:root {
+  --bg: #F2F0EB;
+  --card: #FBFAF7;
+  --text: #22262B;
+  --text-2: #5F646B;
+  --blue: #2E4A6B;
+  --border: #C7C3BA;
+  --line: #DEDAD2;
+  --delay-fg: #8A4B3F;
+  --delay-bd: #D9B8B0;
+  --done-title: #6B7077;
+  --font: 'Noto Sans TC', 'PingFang TC', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+button { font-family: inherit; cursor: pointer; }
+input { font-family: inherit; }
+input::placeholder { color: #7A7F86; }
+
+.app {
+  position: relative;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: clip; /* clip：連程式或鍵盤彈出時的「捲到可見處」也不會把整個畫面推走 */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* 頂部 */
+.header {
+  --pt: max(36px, calc(env(safe-area-inset-top) + 12px));
+  --range-h: 20px; /* 日期區間那一行的高度 */
+  position: relative;
+  padding: var(--pt) 20px 16px;
+  display: flex;
+  justify-content: center;
+  flex: none;
+}
+.header .range { font-family: var(--mono); font-size: 14px; line-height: var(--range-h); color: var(--text-2); }
+/* 水平：和週列最右邊那一欄（日）的中心對齊；垂直：和日期區間同一行的中心對齊。
+   週列左右各 20px、7 欄、間距 4px → 一欄寬 = (全寬 − 64px) ÷ 7 */
+.gear {
+  position: absolute;
+  right: calc(20px + (100% - 64px) / 14 - 22px);
+  top: calc(var(--pt) + var(--range-h) / 2 - 22px);
+  width: 44px; height: 44px;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--text-2);
+}
+
+/* 週日期列 */
+.week {
+  flex: none;
+  margin: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  touch-action: pan-y;
+}
+.day {
+  height: 68px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px;
+  padding: 0;
+}
+.day .wk { font-size: 12px; color: var(--text-2); }
+.day .n { font-family: var(--mono); font-size: 18px; }
+.day .dot { width: 4px; height: 4px; border-radius: 50%; background: transparent; }
+.day.has .dot { background: var(--blue); }
+.day[aria-pressed='true'] { background: var(--blue); color: var(--bg); }
+.day[aria-pressed='true'] .wk { color: var(--bg); }
+.day[aria-pressed='true'] .n { font-weight: 500; }
+.day[aria-pressed='true'].has .dot { background: var(--bg); }
+
+/* 分類膠囊 */
+.tags { flex: none; padding: 18px 20px 6px; display: flex; gap: 8px; }
+.tag {
+  flex: 1; min-width: 0; height: 36px;
+  /* Noto Sans TC 的字身在行框裡偏低，實測約低 0.9px；底部多留 2px 讓文字上移 1px，視覺上才是正中 */
+  padding: 0 0 2px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text);
+  font-size: 13px;
+}
+.tag[aria-pressed='true'] { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* 內容區 */
+.main {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 20px;
+  display: flex; flex-direction: column; gap: 0;
+}
+
+.card-wrap {
+  position: relative; flex: none;
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 0 rgba(34, 38, 43, 0.06);
+}
+.card {
+  background: var(--card);
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.card .row1 { display: flex; justify-content: space-between; align-items: center; }
+.card .left { display: flex; gap: 8px; align-items: center; }
+.card .cat { font-size: 12px; color: var(--blue); font-weight: 500; letter-spacing: 0.12em; }
+.card .delay {
+  font-size: 11px; color: var(--delay-fg);
+  border: 1px solid var(--delay-bd); border-radius: 999px; padding: 1px 7px;
+}
+.card .time { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.card .title { font-size: 16px; font-weight: 500; }
+.card.done .title { color: var(--done-title); text-decoration: line-through; }
+.card .note { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+
+.empty { margin: 24px 0 18px; text-align: center; font-size: 14px; color: var(--text-2); }
+
+/* 隨手記 */
+.notes { flex: none; margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.notes h2 { margin: 0 4px; font-size: 14px; font-weight: 700; letter-spacing: 0.16em; }
+.notes-card {
+  background: var(--card); border-radius: 16px; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 1px 0 rgba(34, 38, 43, 0.06);
+}
+.note-row {
+  padding: 12px 18px;
+  border-bottom: 1px dashed var(--line);
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--card);
+}
+.note-row p { margin: 0; font-size: 14px; line-height: 1.8; }
+.note-row .at { font-family: var(--mono); font-size: 12px; color: var(--text-2); align-self: flex-end; }
+.note-input { display: flex; gap: 8px; align-items: center; padding: 6px 18px; }
+/* 16px：iPhone 的輸入框小於 16px 時，點進去畫面會自動放大 */
+.note-input input {
+  flex: 1; min-width: 0; height: 44px; padding: 0; margin: 0;
+  border: none; background: transparent; outline: none;
+  font-size: 16px; color: var(--text);
+}
+.note-input button {
+  height: 36px; padding: 0 14px 2px; border-radius: 999px;
+  border: 1px solid var(--blue); background: transparent; color: var(--blue);
+  font-size: 13px;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* 底部列 */
+.bottom {
+  flex: none;
+  padding: 10px 20px calc(10px + max(16px, env(safe-area-inset-bottom)));
+  display: flex; gap: 10px;
+  border-top: 1px solid var(--line);
+}
+.btn-new {
+  flex: 1; height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 14px; border: none;
+  background: var(--blue); color: var(--bg); font-size: 15px;
+}
+.btn-cal {
+  width: 48px; height: 48px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 14px; border: 1px solid var(--border);
+  background: transparent; color: var(--text);
+}
+
+/* 左滑 */
+.note-wrap { position: relative; flex: none; overflow: hidden; }
+.swipe-actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; }
+.swipe-actions button { width: 64px; border: none; color: #FFFFFF; font-size: 13px; }
+.card, .note-row {
+  position: relative;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+}
+
+/* 復原提示 */
+.toast {
+  position: absolute;
+  left: 20px; right: 20px;
+  bottom: calc(70px + max(16px, env(safe-area-inset-bottom)));
+  z-index: 4;
+  height: 48px; padding: 0 6px 0 16px;
+  border-radius: 14px;
+  background: var(--text); color: var(--bg);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px;
+}
+.toast button {
+  height: 40px; padding: 0 12px; border: none; background: none;
+  color: #B9CCE3; font-size: 14px; font-weight: 500;
+}
+
+/* 底部面板（新增／編輯、月曆共用） */
+.overlay {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.scrim { position: absolute; inset: 0; border: none; padding: 0; background: rgba(34, 38, 43, 0.32); }
+.sheet {
+  position: relative;
+  overscroll-behavior: contain;
+  max-height: 94dvh; overflow-y: auto;
+  background: var(--bg);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 20px calc(10px + max(16px, env(safe-area-inset-bottom)));
+  display: flex; flex-direction: column; gap: 18px;
+}
+.grabber-zone { align-self: stretch; height: 26px; margin: -10px -20px -8px; display: flex; justify-content: center; align-items: center; touch-action: none; flex: none; }
+.grabber { width: 36px; height: 4px; border-radius: 4px; background: var(--border); flex: none; }
+.sheet-title { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; }
+.field { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.field-label { font-size: 12px; color: var(--text-2); letter-spacing: 0.12em; }
+.text-input {
+  height: 48px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--card); font-size: 16px; color: var(--text); outline: none;
+}
+.time-input { height: 44px; font-family: var(--mono); }
+.chips { display: flex; gap: 8px; }
+.chip {
+  flex: 1; min-width: 0; height: 40px; padding: 0 0 2px;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: var(--text); font-size: 13px;
+}
+.chip[aria-pressed='true'], .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.date-chip { flex: 1.6; padding: 0 10px 2px; font-family: var(--mono); font-size: 12px; }
+.sheet-actions { display: flex; gap: 10px; margin-top: 4px; flex: none; }
+.btn-ghost, .btn-primary { flex: 1; height: 48px; border-radius: 14px; font-size: 15px; }
+.btn-ghost { border: 1px solid var(--border); background: transparent; color: var(--text); }
+.btn-primary { border: none; background: var(--blue); color: var(--bg); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+
+/* 月曆 */
+.cal-sheet { gap: 14px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cal-nav {
+  width: 44px; height: 44px; padding: 0; border: none; background: none; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+}
+.cal-week {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  text-align: center; font-size: 12px; color: var(--text-2);
+}
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 4px; }
+.cal-blank { height: 46px; }
+.cal-day {
+  height: 46px; padding: 0; margin: 0 2px;
+  border-radius: 12px; border: 1px solid transparent;
+  background: transparent; color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+}
+.cal-day .n { font-family: var(--mono); font-size: 15px; }
+.cal-day .dot { width: 4px; height: 4px; border-radius: 50%; background: transparent; }
+.cal-day.has .dot { background: var(--blue); }
+.cal-day.today { border-color: var(--blue); }
+.cal-day[aria-pressed='true'] { background: var(--blue); color: var(--bg); border-color: var(--blue); }
+.cal-day[aria-pressed='true'].has .dot { background: var(--bg); }
+.cal-today {
+  align-self: center; height: 40px; padding: 0 18px 2px; flex: none;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: var(--text); font-size: 13px;
+}
+
+/* 錯過的提醒 */
+.missed {
+  flex: none;
+  margin: 0 20px 12px;
+  background: var(--card);
+  border: 1px solid var(--delay-bd);
+  border-radius: 16px;
+  padding: 10px 14px 10px 16px;
+  box-shadow: 0 1px 0 rgba(34, 38, 43, 0.06);
+}
+.missed-head { display: flex; align-items: center; gap: 4px; }
+.missed-head h2 { flex: 1; margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--delay-fg); }
+.missed-count { font-family: var(--mono); font-weight: 500; margin-left: 4px; }
+.missed-head button {
+  height: 32px; padding: 0 8px; border: none; background: none;
+  color: var(--text-2); font-size: 13px;
+}
+.missed ul { list-style: none; margin: 4px 0 0; padding: 0; max-height: 132px; overflow-y: auto; }
+.missed li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 6px 0; border-top: 1px dashed var(--line); }
+.missed-title { font-size: 14px; font-weight: 500; }
+.missed-body, .missed-date { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+
+/* App 內提醒 */
+.banner {
+  position: absolute; z-index: 7;
+  left: 20px; right: 20px;
+  top: max(12px, calc(env(safe-area-inset-top) + 4px));
+  padding: 12px 8px 12px 16px;
+  border-radius: 14px;
+  background: var(--text); color: var(--bg);
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 6px 20px rgba(34, 38, 43, 0.25);
+}
+.banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.banner-text strong { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.banner-text span { font-family: var(--mono); font-size: 12px; color: #B9CCE3; }
+.banner button { width: 40px; height: 40px; border: none; background: none; color: var(--bg); font-size: 16px; }
+
+/* 設定頁 */
+.settings {
+  position: absolute; inset: 0; z-index: 6;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.settings-head {
+  flex: none; position: relative;
+  padding: max(36px, calc(env(safe-area-inset-top) + 12px)) 20px 12px;
+  display: flex; justify-content: center;
+}
+.settings-head h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.06em; }
+.settings-head .back {
+  position: absolute; left: 8px; top: max(30px, calc(env(safe-area-inset-top) + 6px));
+  width: 44px; height: 44px; padding: 0; border: none; background: none; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+}
+.settings-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 8px 20px calc(24px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 18px;
+}
+.group-title { margin: 0 4px 8px; font-size: 12px; font-weight: 500; color: var(--text-2); letter-spacing: 0.12em; }
+.group { background: var(--card); border-radius: 16px; box-shadow: 0 1px 0 rgba(34, 38, 43, 0.06); overflow: hidden; }
+.group .row {
+  min-height: 48px; padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border-bottom: 1px dashed var(--line); font-size: 15px;
+}
+.group .row:last-child { border-bottom: none; }
+.group .row.stack { flex-direction: column; align-items: stretch; gap: 10px; }
+.group .row.buttons { gap: 10px; }
+.group .row.note { font-size: 13px; color: var(--text-2); line-height: 1.6; margin: 0; }
+.value { font-family: var(--font); font-size: 14px; color: var(--text-2); }
+.btn-outline {
+  flex: 1; height: 40px; padding: 0 10px 2px;
+  border-radius: 999px; border: 1px solid var(--blue);
+  background: transparent; color: var(--blue); font-size: 13px;
+}
+.btn-outline:disabled { opacity: 0.45; cursor: default; }
+.time-field {
+  height: 40px; padding: 0 10px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg); font-family: var(--mono); font-size: 16px; color: var(--text);
+}
+.help { margin: 0; padding: 12px 18px 12px 34px; font-size: 13px; line-height: 1.7; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; }
+.version { margin: 0; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+
+/* ===== 手感：按下回饋、轉場、進出場動畫 ===== */
+.day, .tag, .chip, .btn-new, .btn-cal, .btn-ghost, .btn-primary, .btn-outline, .cal-day, .cal-nav, .gear, .back,
+.note-input button, .missed-head button, .toast button, .cal-today, .swipe-actions button, .banner button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, opacity 0.2s ease, filter 0.15s ease;
+}
+.day:active, .tag:active, .chip:active, .cal-day:active { transform: scale(0.95); }
+.btn-new:active, .btn-cal:active, .btn-ghost:active, .btn-primary:active, .btn-outline:active, .cal-today:active { transform: scale(0.97); filter: brightness(0.94); }
+.gear:active, .back:active, .cal-nav:active, .note-input button:active, .missed-head button:active, .toast button:active, .banner button:active { transform: scale(0.88); }
+.swipe-actions button:active { filter: brightness(0.9); }
+.btn-primary:disabled:active, .btn-outline:disabled:active { transform: none; filter: none; }
+.card.pressed, .note-row.pressed { filter: brightness(0.97); }
+
+/* 注意：進場動畫只能用 backwards；用 both 的話結束後會一直蓋住行內的 transform，拖曳就不會動 */
+/* 面板：遮罩淡入、面板由下滑入 */
+.overlay { animation: fadeIn 0.25s ease backwards; transition: opacity 0.3s ease; }
+.overlay.closing { opacity: 0; pointer-events: none; }
+.sheet { animation: sheetIn 0.34s cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* 設定頁：由右滑入 */
+.settings { animation: slideInRight 0.34s cubic-bezier(0.32, 0.72, 0, 1) backwards; transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1); }
+.settings.closing { transform: translateX(100%); pointer-events: none; }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* 提示：浮上／沉下 */
+.toast, .banner { animation: popIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards; transition: transform 0.24s ease, opacity 0.24s ease; }
+.toast.closing { opacity: 0; transform: translateY(12px); pointer-events: none; }
+.banner.closing { opacity: 0; transform: translateY(-16px); pointer-events: none; }
+@keyframes popIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+.banner { animation-name: popInTop; }
+@keyframes popInTop { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+
+/* 錯過的提醒：整塊收合 */
+.missed { animation: fadeIn 0.28s ease backwards; transition: opacity 0.24s ease, transform 0.24s ease; }
+.missed.closing { opacity: 0; transform: translateY(-6px); pointer-events: none; }
+.missed-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.26s ease; }
+.missed-fold > * { min-height: 0; overflow: hidden; }
+.missed-fold.folded { grid-template-rows: 0fr; }
+
+/* 事項、隨手記增減：展開／收合 */
+.collapse { display: grid; grid-template-rows: 1fr; }
+.collapse-inner { min-height: 0; overflow: hidden; }
+.task-slot { padding-bottom: 10px; }
+.collapse.enter { animation: expand 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.collapse.exit { animation: collapse 0.26s ease both; pointer-events: none; }
+@keyframes expand { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+@keyframes collapse { from { grid-template-rows: 1fr; opacity: 1; } to { grid-template-rows: 0fr; opacity: 0; } }
+.fade-in { animation: fadeIn 0.22s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; }
+  .day:active, .tag:active, .chip:active, .cal-day:active, .btn-new:active, .btn-cal:active, .btn-ghost:active, .btn-primary:active,
+  .btn-outline:active, .gear:active, .back:active, .cal-nav:active { transform: none; }
+}
+
+/* ===== 細節版 ===== */
+/* 日期區間：可以點，點了回到今天 */
+button.range { border: none; background: none; padding: 0; margin: 0; }
+button.range:active { opacity: 0.55; }
+
+/* 輸入框聚焦：外框與游標用主色 */
+input { caret-color: var(--blue); accent-color: var(--blue); }
+.text-input, .time-field { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.text-input:focus, .time-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(46, 74, 107, 0.14); }
+
+/* 空白狀態淡入 */
+.empty { animation: fadeIn 0.4s ease 0.2s backwards; }
+
+/* 儲存鈕不可按：輕輕晃一下 */
+.btn-primary[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+.btn-primary[aria-disabled='true']:active { transform: none; filter: none; }
+.btn-primary.shake { animation: shake 0.36s ease; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+
+.note-input button.shake { animation: shake 0.36s ease; }
+
+/* iPhone 的日期輸入框自帶較高的內距，會比旁邊的膠囊高；強制跟其他膠囊同高 */
+.date-chip {
+  -webkit-appearance: none; appearance: none;
+  height: 40px; min-height: 40px; max-height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; line-height: 1; margin: 0;
+}
+.date-chip::-webkit-date-and-time-value { text-align: center; min-height: 0; margin: 0; padding: 0; line-height: 1; }
+.date-chip::-webkit-datetime-edit { padding: 0; }
+
+/* 重複事項 */
+.card .rep { font-size: 11px; color: var(--text-2); letter-spacing: 0.04em; }
+.field-hint { margin: 2px 2px 0; font-size: 12px; line-height: 1.6; color: var(--text-2); }
+.del-text { margin: 0; font-size: 15px; line-height: 1.7; }
+.del-actions { display: flex; flex-direction: column; gap: 10px; }
+.del-actions .btn-ghost, .del-actions .btn-danger { flex: none; width: 100%; height: 48px; border-radius: 14px; font-size: 15px; }
+.btn-danger { border: none; background: #A4554B; color: #FFFFFF; transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), filter 0.15s ease; touch-action: manipulation; }
+.btn-danger:active { transform: scale(0.97); filter: brightness(0.94); }
+.btn-text { height: 44px; border: none; background: none; color: var(--text-2); font-size: 15px; touch-action: manipulation; }
+.btn-text:active { opacity: 0.55; }
+
+/* 時間滾輪 */
+.wheel {
+  --wheel-row: 40px;
+  position: relative; display: flex; padding: 0 12px;
+  height: calc(var(--wheel-row) * 5);
+  background: var(--card); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 0 rgba(34, 38, 43, 0.06);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
+}
+.wheel-band {
+  position: absolute; left: 12px; right: 12px; top: calc(var(--wheel-row) * 2); height: var(--wheel-row);
+  border-radius: 10px; background: rgba(46, 74, 107, 0.12); pointer-events: none;
+}
+.wheel-col {
+  position: relative; min-width: 0; height: 100%;
+  overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain;
+  padding: calc(var(--wheel-row) * 2) 0;
+  scrollbar-width: none; touch-action: pan-y; outline: none;
+}
+.wheel-col::-webkit-scrollbar { display: none; }
+.wheel-item {
+  height: var(--wheel-row); scroll-snap-align: center;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 18px; color: var(--text-2);
+  transition: color 0.15s ease, font-size 0.15s ease;
+  user-select: none; -webkit-user-select: none;
+}
+.wheel-col.ampm .wheel-item { font-family: var(--font); font-size: 16px; }
+.wheel-item.on { color: var(--text); font-weight: 500; font-size: 22px; }
+.wheel-col.ampm .wheel-item.on { font-size: 18px; }
+.wheel-col:focus-visible .wheel-item.on { color: var(--blue); }
+.cal-day:disabled { opacity: 0.3; cursor: default; }
+.cal-day:disabled:active { transform: none; }
+
+/* 左右滑動換週：新的一週從滑動的方向滑進來 */
+.week.from-right { animation: weekFromRight 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.week.from-left { animation: weekFromLeft 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes weekFromRight { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+@keyframes weekFromLeft { from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: none; } }
