@@ -63,10 +63,11 @@ export function buildReminders(tasks: Task[], settings: Settings, from: number, 
   const open = tasks.filter((t) => !t.deletedAt && !t.done);
 
   for (const t of open) {
-    const at = leadReminderAt(t, settings.leadMinutes);
+    const lead = t.leadMinutes ?? settings.leadMinutes;
+    const at = leadReminderAt(t, lead);
     if (at === null || at <= from || at > to) continue;
     out.push({
-      id: `lead:${t.id}:${t.date}:${t.time}:${settings.leadMinutes}`,
+      id: `lead:${t.id}:${t.date}:${t.time}:${lead}`,
       kind: 'lead',
       at,
       date: t.date,

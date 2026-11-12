@@ -97,13 +97,15 @@ export function saveForm(
       delayDays: 0,
       createdAt: now,
       updatedAt: now,
+      ...(form.lead !== null ? { leadMinutes: form.lead } : {}),
       ...(form.repeat !== 'none' ? { repeat: repeatFromForm(form, newSeriesId) } : {}),
     };
     return { changes: withTask(task), message: '已新增到 ' + dayLabel(form.date) };
   }
   const moved = existing.date !== form.date;
   // 自己改了日期就當作重新安排，不再算「延後」
-  const base: Task = { ...existing, title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) };
+  const { leadMinutes: _lead, ...existingRest } = existing;
+  const base: Task = { ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) };
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
   if (!repeatChanged(existing, form)) return { changes: withTask(base), message };
 

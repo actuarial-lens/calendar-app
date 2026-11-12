@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isPushConfigured } from '../notify/push';
 import { isStandalone, notificationPermission, type PermissionState } from '../notify/native';
-import type { Settings } from '../types';
+import { LEAD_OPTIONS, type Settings } from '../types';
 
 interface Props {
   settings: Settings;
@@ -15,7 +15,6 @@ interface Props {
   onClose: () => void;
 }
 
-const LEADS = [5, 10, 15, 30];
 const PERMISSION_TEXT: Record<PermissionState, string> = {
   granted: '已允許',
   denied: '已拒絕',
@@ -28,7 +27,7 @@ export function SettingsPage({ settings, closing, onChange, onEnable, onTest, on
   const [busy, setBusy] = useState(false);
   const [permission, setPermission] = useState<PermissionState>(notificationPermission());
   const fileRef = useRef<HTMLInputElement>(null);
-  const setPush = (patch: Partial<Settings['push']>) => onChange({ push: { ...settings.push, ...patch } });
+  const setPush = (patch: Partial<Settings['push']>) => onChange({ push: patch as Settings['push'] });
   const standalone = isStandalone();
   const enabled = settings.notificationsEnabled && permission === 'granted';
 
@@ -110,9 +109,9 @@ export function SettingsPage({ settings, closing, onChange, onEnable, onTest, on
               />
             </div>
             <div className="row stack" role="group" aria-labelledby="lead-l">
-              <span id="lead-l">提前提醒（分鐘）</span>
+              <span id="lead-l">預設提前提醒（分鐘）</span>
               <div className="chips">
-                {LEADS.map((m) => (
+                {LEAD_OPTIONS.map((m) => (
                   <button key={m} type="button" className="chip" aria-pressed={settings.leadMinutes === m} onClick={() => onChange({ leadMinutes: m })}>
                     {m}
                   </button>

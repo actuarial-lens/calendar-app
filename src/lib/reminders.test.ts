@@ -36,6 +36,24 @@ describe('提醒時間計算', () => {
   });
 });
 
+describe('每件事自己的提前提醒', () => {
+  const day = at('2026-11-10', '00:00');
+  const lead = (t: Task, st = S()) => buildReminders([t], st, day, day + 86_400_000).find((r) => r.kind === 'lead');
+  it('預設 30 分鐘；沒有自己設定的事項照預設', () => {
+    expect(DEFAULT_SETTINGS.leadMinutes).toBe(30);
+    expect(lead(task({ id: 'a', time: '14:00' }))!.at).toBe(at('2026-11-10', '13:30'));
+  });
+  it('事項自己設定時優先；改預設不影響它，會影響沒設定的', () => {
+    const own = task({ id: 'a', time: '14:00', leadMinutes: 10 });
+    expect(lead(own)!.at).toBe(at('2026-11-10', '13:50'));
+    expect(lead(own, S({ leadMinutes: 5 }))!.at).toBe(at('2026-11-10', '13:50'));
+    expect(lead(task({ id: 'b', time: '14:00' }), S({ leadMinutes: 5 }))!.at).toBe(at('2026-11-10', '13:55'));
+  });
+  it('分鐘數不同，提醒 id 也不同（改了就會重新提醒）', () => {
+    expect(lead(task({ id: 'a', time: '14:00', leadMinutes: 10 }))!.id).not.toBe(lead(task({ id: 'a', time: '14:00' }))!.id);
+  });
+});
+
 describe('早上提醒開關', () => {
   const t = [task({ id: 'a', date: '2026-11-10', time: '14:00' })];
   const kinds = (st: Settings) => buildReminders(t, st, D0, D1).map((r) => r.kind);

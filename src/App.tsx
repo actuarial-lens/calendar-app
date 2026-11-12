@@ -315,6 +315,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           form={formP.shown}
           closing={formP.closing}
           today={today}
+          defaultLead={settings.leadMinutes}
           onChange={(patch) => setForm((f) => (f ? { ...f, ...patch } : f))}
           onCancel={() => setForm(null)}
           onSave={save}

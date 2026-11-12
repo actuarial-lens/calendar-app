@@ -47,6 +47,20 @@ describe('任務動作', () => {
     expect(same!.changes.putTasks[0]).toMatchObject({ date: '2026-11-12', delayDays: 2 });
   });
 
+  it('每件事的提前提醒：新增與編輯都存得進去；選回預設就清掉（跟著預設走）', () => {
+    const created = saveForm({ ...newForm('2026-11-10'), title: 'x', lead: 10 }, undefined, NOW, 'n1')!;
+    expect(created.changes.putTasks[0].leadMinutes).toBe(10);
+    const none = saveForm({ ...newForm('2026-11-10'), title: 'x' }, undefined, NOW, 'n2')!;
+    expect('leadMinutes' in none.changes.putTasks[0]).toBe(false);
+    const t = task({ leadMinutes: 10 });
+    expect(formFromTask(t).lead).toBe(10);
+    expect(formFromTask(task()).lead).toBeNull();
+    const reset = saveForm({ ...formFromTask(t), lead: null }, t, NOW, 'x')!;
+    expect('leadMinutes' in reset.changes.putTasks[0]).toBe(false);
+    const changed = saveForm({ ...formFromTask(task()), lead: 15 }, task(), NOW, 'x')!;
+    expect(changed.changes.putTasks[0].leadMinutes).toBe(15);
+  });
+
   it('延後跨月', () => {
     expect(delayTask(task({ date: '2026-11-30' }), NOW).changes.putTasks[0].date).toBe('2026-12-01');
   });

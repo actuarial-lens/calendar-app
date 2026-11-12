@@ -10,7 +10,7 @@ import { PushProvider, buildPushPayload, isPushConfigured, subscribeToPush, test
 import type { NotificationProvider, SyncContext } from './types';
 
 const at = (d: string, hm: string) => atLocal(d, hm)!;
-const S = (p: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, notificationsEnabled: true, ...p });
+const S = (p: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, notificationsEnabled: true, leadMinutes: 10, ...p });
 const task = (p: Partial<Task> & { id: string }): Task => ({
   date: '2026-11-10', time: '14:00', category: '會議', title: p.id, note: '',
   done: false, delayDays: 0, createdAt: 1, updatedAt: 1, ...p,
@@ -306,5 +306,17 @@ describe('collectBootMissed（打開 App 時）', () => {
     await db.tasks.add(task({ id: 'y', title: '昨天的事', date: '2026-11-09', time: '10:00' }));
     const missed = await collectBootMissed(db, S(), at('2026-11-10', '09:00'));
     expect(missed.filter((r) => r.kind === 'lead').map((r) => r.title)).toEqual(['昨天的事']);
+  });
+});
+
+describe('推播設定快速連續輸入', () => {
+  it('三個欄位幾乎同時寫入，不會互相蓋掉', async () => {
+    const db = new AppDB('push-race-' + Math.random());
+    await Promise.all([
+      saveSettings(db, { push: { endpoint: 'https://x', vapidPublicKey: '', secret: '' } }),
+      saveSettings(db, { push: { vapidPublicKey: 'PUB' } as Settings['push'] }),
+      saveSettings(db, { push: { secret: 'pw' } as Settings['push'] }),
+    ]);
+    expect((await loadSettings(db)).push).toEqual({ endpoint: 'https://x', vapidPublicKey: 'PUB', secret: 'pw' });
   });
 });

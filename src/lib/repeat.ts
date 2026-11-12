@@ -71,6 +71,7 @@ export function planRepeats(tasks: Task[], today: string, now: number, newId: ()
         category: tpl.category,
         title: tpl.title,
         note: tpl.note,
+        ...(tpl.leadMinutes !== undefined ? { leadMinutes: tpl.leadMinutes } : {}),
         done: false,
         delayDays: 0,
         createdAt: now + added.length, // 保持固定順序

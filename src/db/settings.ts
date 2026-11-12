@@ -12,7 +12,9 @@ export async function loadSettings(db: AppDB): Promise<Settings> {
 
 export async function saveSettings(db: AppDB, patch: Partial<Settings>): Promise<Settings> {
   return db.transaction('rw', db.kv, async () => {
-    const next = { ...(await loadSettings(db)), ...patch };
+    const cur = await loadSettings(db);
+    // 推播設定是一組欄位：只改其中一個時，其餘維持資料庫裡最新的值（連續快速輸入也不會互相蓋掉）
+    const next = { ...cur, ...patch, ...(patch.push ? { push: { ...cur.push, ...patch.push } } : {}) };
     await db.kv.put({ key: KEY, value: next });
     return next;
   });

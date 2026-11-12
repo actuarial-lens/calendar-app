@@ -93,7 +93,9 @@ async def main():
         page = await ctx.new_page()
         await page.clock.install(time=datetime.datetime(2026,11,10,13,49,30,tzinfo=TZ))
         await page.goto(URL); await page.wait_for_selector('.card')
-        await page.click('.gear'); await page.click('text=開啟通知'); await page.wait_for_selector('text=通知已開啟'); await page.click('.back')
+        await page.click('.gear'); await page.click('text=開啟通知'); await page.wait_for_selector('text=通知已開啟')
+        await page.locator('#lead-l ~ .chips button', has_text='10').click()  # 預設是 30，這一段的情境用 10
+        await page.click('.back')
         await page.clock.run_for(25_000)   # 13:49:55
         print('C 13:49:55 banner?', await page.locator('.banner').count())
         await page.clock.run_for(30_000)   # 13:50:25

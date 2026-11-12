@@ -23,6 +23,7 @@ export interface Task {
   note: string;
   done: boolean;
   doneAt?: number;
+  leadMinutes?: number; // 這一件事自己的提前提醒分鐘；沒有就用設定裡的預設
   delayDays: number; // 累計延後天數，> 0 時顯示「延 N 天」
   createdAt: number;
   updatedAt: number;
@@ -42,7 +43,7 @@ export interface Note {
 export interface Settings {
   morningEnabled: boolean; // 每天早上的「今天有 N 件事」，預設開
   morningTime: string; // 預設 '08:30'
-  leadMinutes: number; // 預設 10
+  leadMinutes: number; // 預設提前提醒分鐘，預設 30
   notificationsEnabled: boolean;
   push: { endpoint: string; vapidPublicKey: string; secret: string }; // 伺服器網址、公鑰、密碼；預設都是空字串
 }
@@ -50,10 +51,13 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   morningEnabled: true,
   morningTime: '08:30',
-  leadMinutes: 10,
+  leadMinutes: 30,
   notificationsEnabled: false,
   push: { endpoint: '', vapidPublicKey: '', secret: '' },
 };
+
+/** 提前提醒可選的分鐘數 */
+export const LEAD_OPTIONS = [5, 10, 15, 30];
 
 export const CATEGORIES: Category[] = ['會議', '待辦', '私人'];
 export const TAGS: Tag[] = ['全部', '會議', '待辦', '私人', '已完成'];

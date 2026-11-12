@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { quickDates, type EditorForm, type TimeMode } from '../lib/editor';
-import { CATEGORIES, type Category } from '../types';
+import { CATEGORIES, LEAD_OPTIONS, type Category } from '../types';
 import { repeatHint } from '../lib/repeat';
 import { usePresence } from '../lib/usePresence';
 import { CalendarSheet } from './CalendarSheet';
@@ -11,6 +11,7 @@ interface Props {
   form: EditorForm;
   closing: boolean;
   today: string;
+  defaultLead: number; // 設定裡的預設提前分鐘
   onChange: (patch: Partial<EditorForm>) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -18,7 +19,7 @@ interface Props {
 
 const TIME_CHIPS: [TimeMode, string][] = [['', '不設'], ['上午', '上午'], ['下午', '下午'], ['pick', '指定']];
 
-export function EditSheet({ form, closing, today, onChange, onCancel, onSave }: Props) {
+export function EditSheet({ form, closing, today, defaultLead, onChange, onCancel, onSave }: Props) {
   const quick = quickDates(today);
   const isQuick = quick.includes(form.date);
   const [shake, setShake] = useState(false);
@@ -81,6 +82,24 @@ export function EditSheet({ form, closing, today, onChange, onCancel, onSave }: 
           </div>
           {form.timeMode === 'pick' && (
             <TimeWheel value={form.timeVal} onChange={(timeVal) => onChange({ timeVal })} />
+          )}
+          {form.timeMode === 'pick' && (
+            <div className="lead-row" role="group" aria-label="提前提醒（分鐘）">
+              <span className="lead-label">提前提醒（分鐘）</span>
+              <div className="chips">
+                {LEAD_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className="chip"
+                    aria-pressed={(form.lead ?? defaultLead) === m}
+                    onClick={() => onChange({ lead: m === defaultLead ? null : m })}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

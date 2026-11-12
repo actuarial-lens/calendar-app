@@ -145,3 +145,13 @@ describe('repeatHint', () => {
     expect(repeatHint('monthly', '2026-01-31')).toContain('月底');
   });
 });
+
+describe('重複事項沿用提前提醒', () => {
+  it('新排出來的每一筆都帶著同樣的 leadMinutes', async () => {
+    const { planRepeats } = await import('./repeat');
+    const tpl = { id: 'a', date: '2026-11-10', time: '15:00' as const, category: '待辦' as const, title: 't', note: '', done: false, delayDays: 0, createdAt: 1, updatedAt: 1, leadMinutes: 15, repeat: { seriesId: 's', freq: 'weekly' as const, anchor: '2026-11-10', occurrence: '2026-11-10' } };
+    const out = planRepeats([tpl], '2026-11-10', 5, (() => { let n = 0; return () => 'id' + ++n; })());
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((t) => t.leadMinutes === 15)).toBe(true);
+  });
+});
