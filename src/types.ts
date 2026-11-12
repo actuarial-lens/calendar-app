@@ -12,6 +12,7 @@ export interface Repeat {
   anchor: string; // 這組重複的起始日；每月重複用它的「幾號」
   occurrence: string; // 這一筆原本屬於哪一天（被延後、改日期都不會變）
   until?: string; // 結束日期（含當天）；沒有就是不結束
+  important?: boolean; // 這組之後新排出來的每一筆要不要標「重要」（「未來每一次」時設定）
 }
 
 export interface Task {
@@ -24,6 +25,7 @@ export interface Task {
   done: boolean;
   doneAt?: number;
   leadMinutes?: number; // 這一件事自己的提前提醒分鐘；沒有就用設定裡的預設
+  important?: boolean; // 高度重要：卡片上分類右邊顯示紅字「重要」
   delayDays: number; // 累計延後天數，> 0 時顯示「延 N 天」
   createdAt: number;
   updatedAt: number;

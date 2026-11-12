@@ -6,12 +6,15 @@ import { usePresence } from '../lib/usePresence';
 import { CalendarSheet } from './CalendarSheet';
 import { TimeWheel } from './TimeWheel';
 import { Sheet } from './Sheet';
+import { ImportantScopeSheet } from './ImportantScopeSheet';
+import type { RepeatFreq } from '../types';
 
 interface Props {
   form: EditorForm;
   closing: boolean;
   today: string;
   defaultLead: number; // 設定裡的預設提前分鐘
+  seriesFreq: RepeatFreq | null; // 編輯的是已存在的重複事項時，它的頻率（切換「重要」要先問範圍）
   onChange: (patch: Partial<EditorForm>) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -19,23 +22,25 @@ interface Props {
 
 const TIME_CHIPS: [TimeMode, string][] = [['', '不設'], ['上午', '上午'], ['下午', '下午'], ['pick', '指定']];
 
-export function EditSheet({ form, closing, today, defaultLead, onChange, onCancel, onSave }: Props) {
+export function EditSheet({ form, closing, today, defaultLead, seriesFreq, onChange, onCancel, onSave }: Props) {
   const quick = quickDates(today);
   const isQuick = quick.includes(form.date);
   const [shake, setShake] = useState(false);
   const [leadNotice, setLeadNotice] = useState(false); // 剛改成獨立通知時間時跳出的說明框
   const [picking, setPicking] = useState<'date' | 'until' | null>(null); // 正在用月曆選哪一個日期
   const pickP = usePresence(picking, 300);
+  const [askImp, setAskImp] = useState(false); // 重複事項切換「重要」時的詢問框
+  const askP = usePresence(askImp ? !form.important : null, 300); // 記住要切成什麼，關閉動畫時文字不變
   const canSave = form.title.trim().length > 0;
   const isNew = form.mode === 'new';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !picking) onCancel();
+      if (e.key === 'Escape' && !picking && !askImp) onCancel();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel, picking]);
+  }, [onCancel, picking, askImp]);
 
   return (
     <>
@@ -135,6 +140,20 @@ export function EditSheet({ form, closing, today, defaultLead, onChange, onCance
           </div>
         </div>
 
+        <div className="field" role="group" aria-labelledby="ed-imp-l">
+          <span id="ed-imp-l" className="field-label">重要性</span>
+          <div className="chips">
+            <button
+              type="button"
+              className="chip"
+              aria-pressed={form.important}
+              onClick={() => (seriesFreq ? setAskImp(true) : onChange({ important: !form.important }))}
+            >
+              高度重要性
+            </button>
+          </div>
+        </div>
+
         <div className="field" role="group" aria-labelledby="ed-rep-l">
           <span id="ed-rep-l" className="field-label">重複</span>
           <div className="chips">
@@ -201,6 +220,23 @@ export function EditSheet({ form, closing, today, defaultLead, onChange, onCance
           setPicking(null);
         }}
         onClose={() => setPicking(null)}
+      />
+    )}
+    {askP.shown !== null && seriesFreq && (
+      <ImportantScopeSheet
+        title={form.title.trim() || '這件事'}
+        freq={seriesFreq}
+        turnOn={askP.shown}
+        closing={askP.closing}
+        onCancel={() => setAskImp(false)}
+        onOne={() => {
+          onChange({ important: !form.important, importantScope: 'one' });
+          setAskImp(false);
+        }}
+        onFuture={() => {
+          onChange({ important: !form.important, importantScope: 'future' });
+          setAskImp(false);
+        }}
       />
     )}
     </>

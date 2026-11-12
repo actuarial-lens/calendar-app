@@ -4,7 +4,7 @@ import { addDays, dayLabel } from './dates';
 import type { EditorForm } from './editor';
 import { formTime } from './editor';
 import type { Note, Task } from '../types';
-import { endSeries, repeatChanged, repeatFromForm } from './repeat';
+import { endSeries, importantForFuture, repeatChanged, repeatFromForm, setImportant } from './repeat';
 
 const withTask = (t: Task): Action['changes'] => ({ ...emptyChanges(), putTasks: [t] });
 const withNote = (n: Note): Action['changes'] => ({ ...emptyChanges(), putNotes: [n] });
@@ -98,20 +98,31 @@ export function saveForm(
       createdAt: now,
       updatedAt: now,
       ...(form.lead !== null ? { leadMinutes: form.lead } : {}),
-      ...(form.repeat !== 'none' ? { repeat: repeatFromForm(form, newSeriesId) } : {}),
+      ...(form.important ? { important: true } : {}),
+      // 新的重複事項：整組都跟著這一筆的「重要」
+      ...(form.repeat !== 'none' ? { repeat: setImportant(repeatFromForm(form, newSeriesId)!, form.important) } : {}),
     };
     return { changes: withTask(task), message: '已新增到 ' + dayLabel(form.date) };
   }
   const moved = existing.date !== form.date;
   // 自己改了日期就當作重新安排，不再算「延後」
   const { leadMinutes: _lead, ...existingRest } = existing;
-  const base: Task = { ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) };
+  let base: Task = setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important);
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
-  if (!repeatChanged(existing, form)) return { changes: withTask(base), message };
+  // 重複事項選了「未來每一次」：整組設定跟著改；「僅限這次」只改這一筆，整組設定不動
+  const future = !!existing.repeat && form.importantScope === 'future';
+  if (!repeatChanged(existing, form)) {
+    if (!future) return { changes: withTask(base), message };
+    base = { ...base, repeat: setImportant(existing.repeat!, form.important) };
+    return { changes: { ...emptyChanges(), putTasks: [base, ...importantForFuture(all, existing, form.important, now)] }, message };
+  }
 
   // 重複設定改了：這一筆另開一組新的（或變成不重複），舊的那組在這一筆之前結束、之後還沒做的拿掉
   const { repeat: _old, ...plain } = base;
-  const rep = repeatFromForm(form, newSeriesId);
+  const fresh = repeatFromForm(form, newSeriesId);
+  // 新開的一組：原本是重複且選「僅限這次」就沿用舊組的設定，否則跟著這一筆
+  const seriesImportant = existing.repeat && !future ? !!existing.repeat.important : form.important;
+  const rep = fresh && setImportant(fresh, seriesImportant);
   const putTasks: Task[] = [rep ? { ...plain, repeat: rep } : plain];
   if (existing.repeat) putTasks.push(...endSeries(all, existing, now, existing.repeat.occurrence));
   return { changes: { ...emptyChanges(), putTasks }, message };

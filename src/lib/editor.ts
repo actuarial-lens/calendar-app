@@ -15,14 +15,19 @@ export interface EditorForm {
   repeat: 'none' | RepeatFreq;
   until: string; // 重複的結束日期，'' = 不結束
   lead: number | null; // 這一件事自己的提前分鐘；null = 用預設
+  important: boolean;
+  /** 重複事項切換「重要」時選的範圍：'one' 僅限這次、'future' 未來每一次（這一筆和之後還沒完成的） */
+  importantScope: ImportantScope;
 }
+
+export type ImportantScope = 'one' | 'future';
 
 const HM = /^\d{1,2}:\d{2}$/;
 export const DEFAULT_PICK_TIME = '09:00';
 
 /** 新增：空白，日期預設為目前看的那天，分類預設待辦 */
 export function newForm(day: string): EditorForm {
-  return { mode: 'new', id: null, title: '', date: day, category: '待辦', timeMode: '', timeVal: DEFAULT_PICK_TIME, repeat: 'none', until: '', lead: null };
+  return { mode: 'new', id: null, title: '', date: day, category: '待辦', timeMode: '', timeVal: DEFAULT_PICK_TIME, repeat: 'none', until: '', lead: null, important: false, importantScope: 'one' };
 }
 
 /** 編輯：帶入原本的內容 */
@@ -39,6 +44,8 @@ export function formFromTask(t: Task): EditorForm {
     repeat: t.repeat ? t.repeat.freq : 'none',
     until: t.repeat?.until ?? '',
     lead: t.leadMinutes ?? null,
+    important: !!t.important,
+    importantScope: 'one',
   };
 }
 

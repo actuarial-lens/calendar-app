@@ -72,6 +72,8 @@ export function planRepeats(tasks: Task[], today: string, now: number, newId: ()
         title: tpl.title,
         note: tpl.note,
         ...(tpl.leadMinutes !== undefined ? { leadMinutes: tpl.leadMinutes } : {}),
+        // 「重要」看整組的設定，不看範本那一筆（範本可能是「僅限這次」改過的）
+        ...(r.important ? { important: true } : {}),
         done: false,
         delayDays: 0,
         createdAt: now + added.length, // 保持固定順序
@@ -152,4 +154,26 @@ export function repeatHint(freq: RepeatFreq, date: string): string {
   if (freq === 'weekly') return `每${'日一二三四五六'[d.getDay()]}重複`;
   const day = d.getDate();
   return day > 28 ? `每月 ${day} 日重複，沒有那天的月份改在月底` : `每月 ${day} 日重複`;
+}
+
+/** 依 important 設定或拿掉欄位（false 時不留欄位） */
+export function setImportant<T extends { important?: boolean }>(x: T, important: boolean): T {
+  const { important: _i, ...rest } = x;
+  return (important ? { ...rest, important: true } : rest) as T;
+}
+
+/**
+ * 「未來每一次」：同一組裡原定日期在 t 之後的每一筆，整組設定都改掉（之後新排的會跟著），
+ * 其中還沒完成、沒被刪掉的那些，卡片上的「重要」也一起改。t 自己不在回傳裡。
+ */
+export function importantForFuture(all: Task[], t: Task, important: boolean, now: number): Task[] {
+  const r = t.repeat!;
+  const out: Task[] = [];
+  for (const x of all) {
+    if (x.repeat?.seriesId !== r.seriesId || x.id === t.id || x.repeat.occurrence < r.occurrence) continue;
+    const live = !x.done && !x.deletedAt;
+    const next = { ...(live ? setImportant(x, important) : x), repeat: setImportant(x.repeat, important), updatedAt: now };
+    out.push(next);
+  }
+  return out;
 }
