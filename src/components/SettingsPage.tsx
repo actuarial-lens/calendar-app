@@ -91,12 +91,20 @@ export function SettingsPage({ settings, closing, onChange, onEnable, onTest, on
         <section>
           <h2 className="group-title">提醒時間</h2>
           <div className="group">
+            <div className="row stack" role="group" aria-labelledby="morning-l">
+              <span id="morning-l">每天早上的「今天有 N 件事」提醒</span>
+              <div className="chips">
+                <button type="button" className="chip" aria-pressed={settings.morningEnabled} onClick={() => onChange({ morningEnabled: true })}>開</button>
+                <button type="button" className="chip" aria-pressed={!settings.morningEnabled} onClick={() => onChange({ morningEnabled: false })}>關</button>
+              </div>
+            </div>
             <div className="row">
               <label htmlFor="morning">早上提醒時間</label>
               <input
                 id="morning"
                 type="time"
                 className="time-field"
+                disabled={!settings.morningEnabled}
                 value={settings.morningTime}
                 onChange={(e) => e.target.value && onChange({ morningTime: e.target.value })}
               />

@@ -16,7 +16,7 @@ import { commit } from './db/changes';
 import { testPushServer } from './notify/push';
 import { backupFileName, buildBackup, importSummary, parseBackup, planImport } from './lib/backup';
 import { db } from './db/db';
-import { addNote, ensureRepeats, rolloverDb } from './db/maintenance';
+import { addNote, ensureRepeats } from './db/maintenance';
 import { loadSettings, saveSettings } from './db/settings';
 import { useLive } from './db/useLive';
 import * as A from './lib/actions';
@@ -62,12 +62,11 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const [toast, setToast] = useState<{ text: string; undo: Changes } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // 跨日（或回到前景發現已經過了午夜）：沒做完的延到今天；原本停在「今天」的就跟著換到新的一天
+  // 跨日（或回到前景發現已經過了午夜）：原本停在「今天」的就跟著換到新的一天
   const prevToday = useRef(today);
   useEffect(() => {
     const prev = prevToday.current;
     prevToday.current = today;
-    void rolloverDb(db, today);
     if (prev !== today) setDay((d) => (d === prev ? today : d));
   }, [today]);
 
@@ -222,7 +221,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
       // 點到打開的那一列以外的地方，就收合
       onPointerDownCapture={(e) => {
         if (!openId) return;
-        const inside = (e.target as HTMLElement).closest(`[data-swipe-id="${CSS.escape(openId)}"]`);
+        const inside = (e.target as HTMLElement).closest(`[data-swipe-id="${CSS.escape(openId.replace(/>$/, ''))}"]`);
         if (!inside) setOpenId(null);
       }}
     >
@@ -247,6 +246,8 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
               open={openId === t.id}
               anyOpen={openId !== null}
               actions={taskActions(t)}
+              startActions={!t.done && t.delayDays > 0 ? [{ label: '恢復', color: BLUE, run: () => run(A.undelayTask(t, Date.now())) }] : undefined}
+              openKey={openId}
               onOpenChange={setOpenId}
               onEdit={() => setForm(formFromTask(t))}
             />

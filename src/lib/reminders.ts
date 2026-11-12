@@ -78,6 +78,7 @@ export function buildReminders(tasks: Task[], settings: Settings, from: number, 
 
   const last = toISO(new Date(to));
   for (let d = toISO(new Date(from)); d <= last; d = addDays(d, 1)) {
+    if (!settings.morningEnabled) break;
     const at = atLocal(d, settings.morningTime) ?? atLocal(d, DEFAULT_SETTINGS.morningTime)!;
     if (at <= from || at > to) continue;
     const day = sortTasks(open.filter((t) => t.date === d));

@@ -257,7 +257,7 @@ describe('設定與發送紀錄的儲存', () => {
   it('只改一個欄位，其餘保留；推播設定是巢狀的也要合併', async () => {
     await saveSettings(db, { leadMinutes: 30 });
     await saveSettings(db, { morningTime: '09:00' });
-    expect(await loadSettings(db)).toMatchObject({ leadMinutes: 30, morningTime: '09:00', notificationsEnabled: false, push: { endpoint: '', vapidPublicKey: '', secret: '' } });
+    expect(await loadSettings(db)).toMatchObject({ morningEnabled: true, leadMinutes: 30, morningTime: '09:00', notificationsEnabled: false, push: { endpoint: '', vapidPublicKey: '', secret: '' } });
   });
 
   it('發送紀錄：記下後就查得到；最後看到的時間可存取；舊紀錄 14 天後清掉', async () => {
@@ -300,14 +300,11 @@ describe('collectBootMissed（打開 App 時）', () => {
     expect(await store.getLastSeen()).toBe(at('2026-11-10', '16:01'));
   });
 
-  it('在自動延到今天「之前」呼叫：昨天沒做完的事項，昨天的提醒還找得到', async () => {
+  it('昨天沒做完的事項，昨天的提醒還找得到', async () => {
     const { collectBootMissed } = await import('./boot');
-    const { rolloverDb } = await import('../db/maintenance');
     await createReminderStore(db).setLastSeen(at('2026-11-09', '09:00'));
     await db.tasks.add(task({ id: 'y', title: '昨天的事', date: '2026-11-09', time: '10:00' }));
     const missed = await collectBootMissed(db, S(), at('2026-11-10', '09:00'));
     expect(missed.filter((r) => r.kind === 'lead').map((r) => r.title)).toEqual(['昨天的事']);
-    await rolloverDb(db, '2026-11-10');
-    expect((await db.tasks.get('y'))!.date).toBe('2026-11-10');
   });
 });

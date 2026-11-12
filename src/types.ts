@@ -40,6 +40,7 @@ export interface Note {
 }
 
 export interface Settings {
+  morningEnabled: boolean; // 每天早上的「今天有 N 件事」，預設開
   morningTime: string; // 預設 '08:30'
   leadMinutes: number; // 預設 10
   notificationsEnabled: boolean;
@@ -47,6 +48,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  morningEnabled: true,
   morningTime: '08:30',
   leadMinutes: 10,
   notificationsEnabled: false,

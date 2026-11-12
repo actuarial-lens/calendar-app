@@ -27,6 +27,15 @@ export function delayTask(t: Task, now: number): Action {
   };
 }
 
+/** 恢復到原本設定的那天：日期往回推 delayDays 天，延後天數歸零（之後再延後會重新累計） */
+export function undelayTask(t: Task, now: number): Action {
+  const date = addDays(t.date, -t.delayDays);
+  return {
+    changes: withTask({ ...t, date, delayDays: 0, updatedAt: now }),
+    message: '已恢復到 ' + dayLabel(date),
+  };
+}
+
 /** 刪除一律是軟刪除 */
 export function deleteTask(t: Task, now: number): Action {
   return { changes: withTask({ ...t, deletedAt: now, updatedAt: now }), message: '已刪除' };
@@ -93,7 +102,8 @@ export function saveForm(
     return { changes: withTask(task), message: '已新增到 ' + dayLabel(form.date) };
   }
   const moved = existing.date !== form.date;
-  const base: Task = { ...existing, title, date: form.date, time, category: form.category, updatedAt: now };
+  // 自己改了日期就當作重新安排，不再算「延後」
+  const base: Task = { ...existing, title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) };
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
   if (!repeatChanged(existing, form)) return { changes: withTask(base), message };
 

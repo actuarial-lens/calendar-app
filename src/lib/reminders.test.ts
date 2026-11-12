@@ -36,6 +36,16 @@ describe('提醒時間計算', () => {
   });
 });
 
+describe('早上提醒開關', () => {
+  const t = [task({ id: 'a', date: '2026-11-10', time: '14:00' })];
+  const kinds = (st: Settings) => buildReminders(t, st, D0, D1).map((r) => r.kind);
+  it('預設是開的；關掉後沒有早上提醒，提前提醒不受影響', () => {
+    expect(DEFAULT_SETTINGS.morningEnabled).toBe(true);
+    expect(kinds(S())).toEqual(['morning', 'lead']);
+    expect(kinds(S({ morningEnabled: false }))).toEqual(['lead']);
+  });
+});
+
 describe('buildReminders', () => {
   const s = S({ morningTime: '08:30', leadMinutes: 10 });
 

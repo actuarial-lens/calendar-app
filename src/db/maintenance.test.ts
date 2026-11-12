@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AppDB } from './db';
-import { PURGE_AFTER_MS, addNote, buildSampleData, isExpired, purgeExpired, rolloverDb, seedIfFirstRun } from './maintenance';
+import { PURGE_AFTER_MS, addNote, buildSampleData, isExpired, purgeExpired, seedIfFirstRun } from './maintenance';
 
 const DAY = 24 * 60 * 60 * 1000;
 let db: AppDB;
@@ -58,22 +58,6 @@ describe('範例資料與隨手記', () => {
     const rows = await db.notes.toArray();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ date: '2026-11-12', text: '買電池', createdAt: 12345 });
-  });
-});
-
-describe('自動延到今天（資料庫）', () => {
-  it('昨天沒做完的事項被移到今天並累加延後天數；隨手記不動', async () => {
-    const base = { time: '' as const, category: '待辦' as const, note: '', delayDays: 0, createdAt: 1, updatedAt: 1 };
-    await db.tasks.bulkAdd([
-      { ...base, id: 'a', title: 'a', date: '2026-11-08', done: false },
-      { ...base, id: 'b', title: 'b', date: '2026-11-08', done: true },
-    ]);
-    await db.notes.add({ id: 'n', date: '2026-11-08', text: 'x', createdAt: 1, updatedAt: 1 });
-    expect(await rolloverDb(db, '2026-11-10', 77)).toBe(1);
-    expect(await db.tasks.get('a')).toMatchObject({ date: '2026-11-10', delayDays: 2, updatedAt: 77 });
-    expect(await db.tasks.get('b')).toMatchObject({ date: '2026-11-08' });
-    expect((await db.notes.get('n'))!.date).toBe('2026-11-08');
-    expect(await rolloverDb(db, '2026-11-10', 78)).toBe(0);
   });
 });
 

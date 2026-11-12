@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Note, Task } from '../types';
-import { completeTask, deleteNote, deleteTask, delayNote, delayTask, noteToTask, restoreTask, saveForm } from './actions';
+import { completeTask, deleteNote, deleteTask, delayNote, delayTask, noteToTask, restoreTask, saveForm, undelayTask } from './actions';
 import { formFromTask, formTime, newForm, quickDates } from './editor';
 
 const task = (p: Partial<Task> = {}): Task => ({
@@ -25,6 +25,26 @@ describe('任務動作', () => {
     const a = delayTask(task({ delayDays: 2, date: '2026-11-11' }), NOW);
     expect(a.changes.putTasks[0]).toMatchObject({ date: '2026-11-12', delayDays: 3, time: '14:00' });
     expect(a.message).toBe('已延到 11/12（四）');
+  });
+
+  it('恢復到原日期：日期往回推、延後天數歸零；再延後重新累計', () => {
+    const a = undelayTask(task({ date: '2026-11-12', delayDays: 2 }), NOW);
+    expect(a.changes.putTasks[0]).toMatchObject({ date: '2026-11-10', delayDays: 0, time: '14:00', updatedAt: NOW });
+    expect(a.message).toBe('已恢復到 11/10（二）');
+    const again = delayTask(a.changes.putTasks[0], NOW + 1);
+    expect(again.changes.putTasks[0]).toMatchObject({ date: '2026-11-11', delayDays: 1 });
+  });
+
+  it('恢復跨月、跨年也正確', () => {
+    expect(undelayTask(task({ date: '2027-01-02', delayDays: 3 }), NOW).changes.putTasks[0].date).toBe('2026-12-30');
+  });
+
+  it('在編輯面板自己改日期：延後天數歸零（避免之後「恢復」回錯的日期）', () => {
+    const t = task({ date: '2026-11-12', delayDays: 2 });
+    const moved = saveForm({ ...formFromTask(t), date: '2026-11-20' }, t, NOW, 'x');
+    expect(moved!.changes.putTasks[0]).toMatchObject({ date: '2026-11-20', delayDays: 0 });
+    const same = saveForm({ ...formFromTask(t), title: '改標題' }, t, NOW, 'x');
+    expect(same!.changes.putTasks[0]).toMatchObject({ date: '2026-11-12', delayDays: 2 });
   });
 
   it('延後跨月', () => {
@@ -95,11 +115,11 @@ describe('編輯表單', () => {
     expect(a.message).toBe('已新增到 11/12（四）');
   });
 
-  it('編輯：改日期 → 「已移到」；沒改日期 → 「已更新」；備註與延後天數保留', () => {
+  it('編輯：改日期 → 「已移到」；沒改日期 → 「已更新」；備註保留；自己改日期時延後天數歸零', () => {
     const t = task({ delayDays: 2 });
     const moved = saveForm({ ...formFromTask(t), date: '2026-11-13' }, t, NOW, 'x')!;
     expect(moved.message).toBe('已移到 11/13（五）');
-    expect(moved.changes.putTasks[0]).toMatchObject({ id: 't1', date: '2026-11-13', note: '備註', delayDays: 2 });
+    expect(moved.changes.putTasks[0]).toMatchObject({ id: 't1', date: '2026-11-13', note: '備註', delayDays: 0 });
     const same = saveForm({ ...formFromTask(t), title: '新標題' }, t, NOW, 'x')!;
     expect(same.message).toBe('已更新');
     expect(same.changes.putTasks[0].title).toBe('新標題');

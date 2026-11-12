@@ -187,6 +187,7 @@ input::placeholder { color: #7A7F86; }
 /* 左滑 */
 .note-wrap { position: relative; flex: none; overflow: hidden; }
 .swipe-actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; }
+.swipe-actions.start { right: auto; left: 0; }
 .swipe-actions button { width: 64px; border: none; color: #FFFFFF; font-size: 13px; }
 .card, .note-row {
   position: relative;

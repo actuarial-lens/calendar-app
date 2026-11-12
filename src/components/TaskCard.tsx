@@ -1,7 +1,7 @@
 import type { Phase } from '../lib/animatedList';
 import type { Task } from '../types';
 import { REPEAT_LABEL } from '../lib/repeat';
-import { SwipeRow, type SwipeAction } from './SwipeRow';
+import { SwipeRow, START_SUFFIX, type SwipeAction } from './SwipeRow';
 
 interface Props {
   task: Task;
@@ -9,11 +9,13 @@ interface Props {
   open: boolean;
   anyOpen: boolean;
   actions: SwipeAction[];
+  startActions?: SwipeAction[];
+  openKey: string | null;
   onOpenChange: (id: string | null) => void;
   onEdit: () => void;
 }
 
-export function TaskCard({ task, phase, open, anyOpen, actions, onOpenChange, onEdit }: Props) {
+export function TaskCard({ task, phase, open, anyOpen, actions, startActions, openKey, onOpenChange, onEdit }: Props) {
   return (
     <div className={'collapse ' + phase}>
       <div className="collapse-inner task-slot">
@@ -22,6 +24,8 @@ export function TaskCard({ task, phase, open, anyOpen, actions, onOpenChange, on
           open={open}
           anyOpen={anyOpen}
           actions={actions}
+          startActions={startActions}
+          startOpen={openKey === task.id + START_SUFFIX}
           onOpenChange={onOpenChange}
           onTap={onEdit}
           wrapClass="card-wrap"

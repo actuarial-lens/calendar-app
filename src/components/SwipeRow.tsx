@@ -11,6 +11,10 @@ interface Props {
   open: boolean;
   anyOpen: boolean; // 目前有沒有任何一列是打開的
   actions: SwipeAction[];
+  /** 由左向右滑才會出現的按鈕（沒有就不能往右滑） */
+  startActions?: SwipeAction[];
+  /** 右滑打開的狀態，目前有哪一列的 key 是 id + START_SUFFIX */
+  startOpen?: boolean;
   onOpenChange: (id: string | null) => void;
   onTap?: () => void;
   wrapClass: string;
@@ -19,14 +23,21 @@ interface Props {
 }
 
 const BTN_W = 64;
+/** 右滑打開時，回報給外面的 key（id 後面加這個符號） */
+export const START_SUFFIX = '>';
 /** 拉過按鈕區之後的阻力（越小越難拉）與最多能多拉的距離 */
 const OVERPULL_RESISTANCE = 0.35;
 const OVERPULL_MAX = 36;
 
 /** 手指跟著動的位置：左滑超過按鈕區之後要有阻力，往右不能超過原位 */
-export function swipeX(base: number, dx: number, W: number): number {
+export function swipeX(base: number, dx: number, W: number, Ws = 0): number {
   const raw = base + dx;
-  if (raw >= 0) return 0;
+  if (raw > 0) {
+    if (Ws === 0) return 0;
+    if (raw <= Ws) return raw;
+    return Math.min(Ws + OVERPULL_MAX, Ws + (raw - Ws) * OVERPULL_RESISTANCE);
+  }
+  if (raw === 0) return 0;
   if (raw >= -W) return raw;
   return Math.max(-W - OVERPULL_MAX, -W + (raw + W) * OVERPULL_RESISTANCE);
 }
@@ -35,8 +46,9 @@ export function swipeX(base: number, dx: number, W: number): number {
  * 左滑列。先判斷手勢方向（水平或垂直）才決定要不要跟著手指動，
  * 所以垂直捲動不會誤觸左滑。往左滑超過按鈕區一半才停在打開狀態。
  */
-export function SwipeRow({ id, open, anyOpen, actions, onOpenChange, onTap, wrapClass, frontClass, children }: Props) {
+export function SwipeRow({ id, open, anyOpen, actions, startActions = [], startOpen = false, onOpenChange, onTap, wrapClass, frontClass, children }: Props) {
   const W = actions.length * BTN_W;
+  const Ws = startActions.length * BTN_W;
   const gesture = useRef<{ x0: number; y0: number; base: number; axis: 'x' | 'y' | null } | null>(null);
   const dxRef = useRef(0);
   const wasOpenRef = useRef(false); // 按下去的當下，有沒有任何一列是打開的
@@ -45,8 +57,8 @@ export function SwipeRow({ id, open, anyOpen, actions, onOpenChange, onTap, wrap
   const [dragging, setDragging] = useState(false);
   const [pressed, setPressed] = useState(false); // 手指按著、還沒判斷成滑動時，給一點按下的回饋
 
-  const base = open ? -W : 0;
-  const x = dragging ? swipeX(base, dx, W) : base;
+  const base = open ? -W : startOpen ? Ws : 0;
+  const x = dragging ? swipeX(base, dx, W, Ws) : base;
 
   const finish = () => {
     const g = gesture.current;
@@ -57,7 +69,9 @@ export function SwipeRow({ id, open, anyOpen, actions, onOpenChange, onTap, wrap
       setDragging(false);
       setDx(0);
       dxRef.current = 0;
-      onOpenChange(final < -W / 2 ? id : null);
+      if (final < -W / 2) onOpenChange(id);
+      else if (Ws > 0 && final > Ws / 2) onOpenChange(id + START_SUFFIX);
+      else onOpenChange(null);
     }
   };
 
@@ -75,6 +89,15 @@ export function SwipeRow({ id, open, anyOpen, actions, onOpenChange, onTap, wrap
 
   return (
     <div className={wrapClass} data-swipe-id={id}>
+      {startActions.length > 0 && (
+        <div className="swipe-actions start">
+          {startActions.map((a) => (
+            <button key={a.label} type="button" tabIndex={startOpen ? 0 : -1} style={{ background: a.color }} onClick={a.run}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="swipe-actions">
         {actions.map((a) => (
           <button key={a.label} type="button" tabIndex={open ? 0 : -1} style={{ background: a.color }} onClick={a.run}>

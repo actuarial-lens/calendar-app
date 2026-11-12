@@ -1,7 +1,6 @@
 import { addDays, todayISO } from '../lib/dates';
 import { newId } from '../lib/id';
 import { planRepeats } from '../lib/repeat';
-import { planRollover } from '../lib/rollover';
 import type { Note, Task } from '../types';
 import type { AppDB } from './db';
 
@@ -114,15 +113,6 @@ export async function seedIfFirstRun(db: AppDB, today: string, now: number = Dat
 
 export async function addNote(db: AppDB, date: string, text: string, now: number = Date.now()): Promise<void> {
   await db.notes.add({ id: newId(), date, text, createdAt: now, updatedAt: now });
-}
-
-/** 沒做完自動延到今天（每次打開 App、日期跨過午夜時呼叫）。回傳被移動的事項數。 */
-export async function rolloverDb(db: AppDB, today: string, now: number = Date.now()): Promise<number> {
-  return db.transaction('rw', db.tasks, async () => {
-    const changed = planRollover(await db.tasks.toArray(), today, now);
-    if (changed.length) await db.tasks.bulkPut(changed);
-    return changed.length;
-  });
 }
 
 /** 補排重複事項（開啟 App、過了午夜、時間往後走時用）。回傳新增幾筆 */
