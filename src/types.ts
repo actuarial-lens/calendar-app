@@ -43,14 +43,14 @@ export interface Settings {
   morningTime: string; // 預設 '08:30'
   leadMinutes: number; // 預設 10
   notificationsEnabled: boolean;
-  push: { endpoint: string; vapidPublicKey: string }; // 預設都是空字串
+  push: { endpoint: string; vapidPublicKey: string; secret: string }; // 伺服器網址、公鑰、密碼；預設都是空字串
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   morningTime: '08:30',
   leadMinutes: 10,
   notificationsEnabled: false,
-  push: { endpoint: '', vapidPublicKey: '' },
+  push: { endpoint: '', vapidPublicKey: '', secret: '' },
 };
 
 export const CATEGORIES: Category[] = ['會議', '待辦', '私人'];

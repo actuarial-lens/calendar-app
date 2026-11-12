@@ -15,8 +15,19 @@ export interface PushPayload {
 
 /** 空的就代表還沒設定；沒設定時不訂閱、不發送 */
 export function isPushConfigured(settings: Settings): boolean {
-  return settings.push.endpoint.trim() !== '' && settings.push.vapidPublicKey.trim() !== '';
+  const { endpoint, vapidPublicKey, secret } = settings.push;
+  return endpoint.trim() !== '' && vapidPublicKey.trim() !== '' && secret.trim() !== '';
 }
+
+/** 伺服器網址（去掉結尾斜線）＋路徑 */
+export function serverUrl(settings: Settings, path: string): string {
+  return settings.push.endpoint.trim().replace(/\/+$/, '') + path;
+}
+
+const authHeaders = (settings: Settings) => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${settings.push.secret.trim()}`,
+});
 
 /** 把「接下來的提醒排程」整理成可以送給伺服器的資料 */
 export function buildPushPayload(reminders: Reminder[], subscription: unknown, now: number): PushPayload {
@@ -81,15 +92,15 @@ export class PushProvider implements NotificationProvider {
     const registration = await this.deps.getRegistration();
     if (!registration?.pushManager) return;
 
-    const subscription = await subscribeToPush(registration, ctx.settings.push.vapidPublicKey);
+    const subscription = await subscribeToPush(registration, ctx.settings.push.vapidPublicKey.trim());
     const reminders = buildReminders(ctx.tasks, ctx.settings, ctx.now, ctx.now + PUSH_HORIZON_MS);
     const payload = buildPushPayload(reminders, subscription.toJSON(), ctx.now);
 
     const fingerprint = JSON.stringify([payload.subscription, payload.reminders]);
     if (fingerprint === this.lastSent) return;
-    const res = await this.deps.fetch(ctx.settings.push.endpoint, {
+    const res = await this.deps.fetch(serverUrl(ctx.settings, '/sync'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(ctx.settings),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`推播伺服器回應 ${res.status}`);
@@ -102,3 +113,25 @@ export const browserPushDeps = (): PushDeps => ({
   permission: () => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission),
   fetch: (...args) => fetch(...args),
 });
+
+/** 請伺服器立刻推一則測試通知給這支手機；回傳要顯示給使用者的訊息 */
+export async function testPushServer(settings: Settings, deps: PushDeps = browserPushDeps()): Promise<string> {
+  if (!isPushConfigured(settings)) return '請先填好伺服器網址、公鑰與密碼。';
+  if (deps.permission() !== 'granted') return '請先按「開啟通知」並允許。';
+  const registration = await deps.getRegistration();
+  if (!registration?.pushManager) return '這個環境不支援背景推播（請從主畫面開啟）。';
+  try {
+    const subscription = await subscribeToPush(registration, settings.push.vapidPublicKey.trim());
+    const res = await deps.fetch(serverUrl(settings, '/test'), {
+      method: 'POST',
+      headers: authHeaders(settings),
+      body: JSON.stringify({ subscription: subscription.toJSON() }),
+    });
+    if (res.status === 401) return '密碼不正確。';
+    if (res.status === 403) return '伺服器人數已滿。';
+    if (!res.ok) return `伺服器回應 ${res.status}，請檢查設定。`;
+    return '已請伺服器發送，幾秒內應該會收到通知。';
+  } catch {
+    return '連不上伺服器，請檢查網址與網路。';
+  }
+}

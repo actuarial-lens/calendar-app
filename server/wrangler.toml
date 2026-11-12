@@ -1,0 +1,16 @@
+# 用命令列部署時才需要（用網頁後台貼上程式的話可以忽略這個檔案）
+name = "calendar-push"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "PUSH_KV"
+id = "把 KV 的 id 貼在這裡"
+
+[vars]
+VAPID_SUBJECT = "mailto:你的信箱@example.com"
+# 建議填你的 App 網址（不含路徑），只允許它來呼叫：
+# ALLOWED_ORIGIN = "https://帳號.github.io"

@@ -13,6 +13,8 @@ import { TaskCard } from './components/TaskCard';
 import { Toast } from './components/Toast';
 import { WeekStrip } from './components/WeekStrip';
 import { commit } from './db/changes';
+import { testPushServer } from './notify/push';
+import { backupFileName, buildBackup, importSummary, parseBackup, planImport } from './lib/backup';
 import { db } from './db/db';
 import { addNote, ensureRepeats, rolloverDb } from './db/maintenance';
 import { loadSettings, saveSettings } from './db/settings';
@@ -141,6 +143,38 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
     await commit(db, inverse);
   };
 
+  /** 匯出：產生 JSON 檔，能分享就開分享表單（可存到「檔案」），否則下載 */
+  const exportBackup = async (): Promise<string> => {
+    const [allT, allN] = await Promise.all([db.tasks.toArray(), db.notes.toArray()]);
+    const backup = buildBackup(allT, allN, Date.now());
+    const file = new File([JSON.stringify(backup, null, 2)], backupFileName(today), { type: 'application/json' });
+    try {
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return `已匯出 ${backup.tasks.length} 筆事項、${backup.notes.length} 則備忘。`;
+      }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return '已取消匯出。';
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    return `已匯出 ${backup.tasks.length} 筆事項、${backup.notes.length} 則備忘。`;
+  };
+
+  /** 匯入：檢查格式 → 合併（較新的留下、不刪除任何現有資料） */
+  const importBackup = async (f: File): Promise<string> => {
+    const parsed = parseBackup(await f.text());
+    if (!parsed.ok) return parsed.error;
+    const [allT, allN] = await Promise.all([db.tasks.toArray(), db.notes.toArray()]);
+    const plan = planImport(parsed.backup, allT, allN);
+    await commit(db, plan.changes);
+    return importSummary(plan, parsed.skipped);
+  };
+
   /** 重複事項要先問；一般事項直接刪 */
   const askDelete = (t: Task) => {
     if (!t.repeat) return void run(A.deleteTask(t, Date.now()));
@@ -248,6 +282,9 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           onChange={(patch) => void saveSettings(db, patch)}
           onEnable={() => enableNotifications(db)}
           onTest={sendTestNotification}
+          onTestPush={() => testPushServer(settings)}
+          onExport={exportBackup}
+          onImport={importBackup}
           onClose={() => setSettingsOpen(false)}
         />
       )}

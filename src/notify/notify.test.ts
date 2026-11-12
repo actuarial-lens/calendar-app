@@ -6,7 +6,7 @@ import { atLocal, type Reminder } from '../lib/reminders';
 import { DEFAULT_SETTINGS, type Settings, type Task } from '../types';
 import { LocalProvider, drainDue, type ReminderStore } from './local';
 import { NotificationManager } from './manager';
-import { PushProvider, buildPushPayload, isPushConfigured, subscribeToPush, urlBase64ToUint8Array, type PushDeps } from './push';
+import { PushProvider, buildPushPayload, isPushConfigured, subscribeToPush, testPushServer, urlBase64ToUint8Array, type PushDeps } from './push';
 import type { NotificationProvider, SyncContext } from './types';
 
 const at = (d: string, hm: string) => atLocal(d, hm)!;
@@ -130,9 +130,10 @@ describe('PushProvider（推播，設定留空時要自動略過）', () => {
 
   it('預設設定是空的 → 不算「已設定」', () => {
     expect(isPushConfigured(DEFAULT_SETTINGS)).toBe(false);
-    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: 'https://x', vapidPublicKey: '' } })).toBe(false);
-    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: '', vapidPublicKey: 'abc' } })).toBe(false);
-    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: 'https://x', vapidPublicKey: 'abc' } })).toBe(true);
+    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: 'https://x', vapidPublicKey: '', secret: 's' } })).toBe(false);
+    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: '', vapidPublicKey: 'abc', secret: 's' } })).toBe(false);
+    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: 'https://x', vapidPublicKey: 'abc', secret: '' } })).toBe(false);
+    expect(isPushConfigured({ ...DEFAULT_SETTINGS, push: { endpoint: 'https://x', vapidPublicKey: 'abc', secret: 's' } })).toBe(true);
   });
 
   it('空設定：不取得註冊、不訂閱、不發送，也不丟錯', async () => {
@@ -147,12 +148,13 @@ describe('PushProvider（推播，設定留空時要自動略過）', () => {
   it('有設定：訂閱並把排程送到伺服器；資料沒變就不重送', async () => {
     const { deps, subscribe } = mkDeps();
     const p = new PushProvider(deps);
-    const settings = S({ push: { endpoint: 'https://server.example/schedule', vapidPublicKey: 'BEl6' } });
+    const settings = S({ push: { endpoint: 'https://server.example/', vapidPublicKey: 'BEl6', secret: 'pw' } });
     await p.sync(ctx(t, now, settings), 'change');
     expect(subscribe).toHaveBeenCalledTimes(1);
     expect(deps.fetch).toHaveBeenCalledTimes(1);
     const [url, init] = (deps.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toBe('https://server.example/schedule');
+    expect(url).toBe('https://server.example/sync');
+    expect(init.headers.Authorization).toBe('Bearer pw');
     const body = JSON.parse(init.body);
     expect(body.version).toBe(1);
     expect(body.subscription.endpoint).toBe('https://push.example/abc');
@@ -167,14 +169,14 @@ describe('PushProvider（推播，設定留空時要自動略過）', () => {
 
   it('沒有通知權限時不訂閱、不發送', async () => {
     const { deps, subscribe } = mkDeps({ permission: () => 'default' });
-    const settings = S({ push: { endpoint: 'https://server.example/schedule', vapidPublicKey: 'BEl6' } });
+    const settings = S({ push: { endpoint: 'https://server.example/', vapidPublicKey: 'BEl6', secret: 'pw' } });
     await new PushProvider(deps).sync(ctx(t, now, settings), 'change');
     expect(subscribe).not.toHaveBeenCalled();
     expect(deps.fetch).not.toHaveBeenCalled();
   });
 
   it('伺服器掛了（網路錯誤或非 2xx）：由 manager 接住，不影響其他提醒', async () => {
-    const settings = S({ push: { endpoint: 'https://server.example/schedule', vapidPublicKey: 'BEl6' } });
+    const settings = S({ push: { endpoint: 'https://server.example/', vapidPublicKey: 'BEl6', secret: 'pw' } });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const bad = new PushProvider(mkDeps({ fetch: vi.fn(async () => { throw new Error('offline'); }) }).deps);
     const err = new PushProvider(mkDeps({ fetch: vi.fn(async () => ({ ok: false, status: 500 }) as Response) }).deps);
@@ -183,6 +185,21 @@ describe('PushProvider（推播，設定留空時要自動略過）', () => {
     await expect(manager.sync(ctx(t, now, settings), 'change')).resolves.toBeUndefined();
     expect(other.sync).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('測試伺服器：未設定、無權限、密碼錯、成功各有對應訊息，並帶密碼', async () => {
+    const settings = S({ push: { endpoint: 'https://server.example', vapidPublicKey: 'BEl6', secret: 'pw' } });
+    expect(await testPushServer(DEFAULT_SETTINGS, mkDeps().deps)).toContain('先填好');
+    expect(await testPushServer(settings, mkDeps({ permission: () => 'default' }).deps)).toContain('開啟通知');
+    const r401 = mkDeps({ fetch: vi.fn(async () => ({ ok: false, status: 401 }) as Response) });
+    expect(await testPushServer(settings, r401.deps)).toBe('密碼不正確。');
+    const ok = mkDeps();
+    expect(await testPushServer(settings, ok.deps)).toContain('已請伺服器發送');
+    const [url, init] = (ok.deps.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe('https://server.example/test');
+    expect(init.headers.Authorization).toBe('Bearer pw');
+    const down = mkDeps({ fetch: vi.fn(async () => { throw new Error('x'); }) });
+    expect(await testPushServer(settings, down.deps)).toContain('連不上');
   });
 
   it('已經訂閱過就沿用，不重複訂閱', async () => {
@@ -240,7 +257,7 @@ describe('設定與發送紀錄的儲存', () => {
   it('只改一個欄位，其餘保留；推播設定是巢狀的也要合併', async () => {
     await saveSettings(db, { leadMinutes: 30 });
     await saveSettings(db, { morningTime: '09:00' });
-    expect(await loadSettings(db)).toMatchObject({ leadMinutes: 30, morningTime: '09:00', notificationsEnabled: false, push: { endpoint: '', vapidPublicKey: '' } });
+    expect(await loadSettings(db)).toMatchObject({ leadMinutes: 30, morningTime: '09:00', notificationsEnabled: false, push: { endpoint: '', vapidPublicKey: '', secret: '' } });
   });
 
   it('發送紀錄：記下後就查得到；最後看到的時間可存取；舊紀錄 14 天後清掉', async () => {
