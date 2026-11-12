@@ -7,15 +7,15 @@ App 關著、手機鎖屏時也要準時跳通知，就需要這個小伺服器�
 ## 步驟（全部在網頁上做，不用裝東西）
 
 1. **產生金鑰**：在電腦執行 `node server/generate-keys.mjs`（沒有 Node 的話請 Claude 幫你產生）。會印出三行：`VAPID_PUBLIC`、`VAPID_PRIVATE`、`APP_SECRET`。每個人各用一組自己的？不用，**大家共用同一組**即可。請自己保管，別貼到公開的地方。
-2. 登入 <https://dash.cloudflare.com> → **Workers & Pages** → **Create** → **Create Worker**，名稱填 `calendar-push` → Deploy → **Edit code**，把 `server/worker.js` 整份貼上取代 → **Deploy**。
-3. **建立 KV**：左側 **Storage & Databases → KV → Create**，名稱 `calendar-push-kv`。回到 Worker → **Settings → Bindings → Add → KV namespace**，變數名稱填 **`PUSH_KV`**，選剛建立的 KV。
+2. 登入 <https://dash.cloudflare.com> → **Workers & Pages** → **Create** → **Create Worker**，名稱填 `calendar-app-notification` → Deploy → **Edit code**，把 `server/worker.js` 整份貼上取代 → **Deploy**。
+3. **建立 KV**：左側 **Storage & Databases → KV → Create**，名稱 `calendar-app-notification-kv`。回到 Worker → **Settings → Bindings → Add → KV namespace**，變數名稱填 **`PUSH_KV`**，選剛建立的 KV。
 4. **設定變數**：Worker → **Settings → Variables and Secrets**，新增（Secret 類型較安全）：
    - `VAPID_PUBLIC`、`VAPID_PRIVATE`、`APP_SECRET`：貼步驟 1 的值
    - `VAPID_SUBJECT`：`mailto:你的信箱`（iPhone 的推播服務要求有效聯絡方式）
    - 選填 `ALLOWED_ORIGIN`：App 的網址，例如 `https://actuarial-lens.github.io`（不要結尾斜線）
    - 選填 `MAX_USERS`：人數上限
 5. **每分鐘排程**：Worker → **Settings → Trigger Events → Add → Cron Triggers**，填 `* * * * *`。
-6. 記下 Worker 網址（`https://calendar-push.<帳號>.workers.dev`）。
+6. 記下 Worker 網址（`https://calendar-app-notification.<帳號>.workers.dev`）。
 7. **每支手機**：用主畫面圖示開 Calendar → 設定 → 按「開啟通知」允許 → 在「背景提醒」填 **伺服器網址、公鑰（VAPID_PUBLIC）、密碼（APP_SECRET）** → 按「測試伺服器推播」，幾秒內應收到通知。
 
 ## 注意

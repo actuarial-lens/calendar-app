@@ -1,5 +1,5 @@
 # 用命令列部署時才需要（用網頁後台貼上程式的話可以忽略這個檔案）
-name = "calendar-push"
+name = "calendar-app-notification"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
