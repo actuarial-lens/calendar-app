@@ -37,7 +37,8 @@ function validTask(t: unknown): t is Task {
     (o.category === '會議' || o.category === '待辦' || o.category === '私人') &&
     isStr(o.title) && isStr(o.note) && typeof o.done === 'boolean' &&
     isNum(o.delayDays) && isNum(o.createdAt) && isNum(o.updatedAt) &&
-    (o.important === undefined || typeof o.important === 'boolean')
+    (o.important === undefined || typeof o.important === 'boolean') &&
+    (o.order === undefined || isNum(o.order))
   );
 }
 function validNote(n: unknown): n is Note {

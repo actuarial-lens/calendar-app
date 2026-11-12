@@ -1,4 +1,5 @@
 import type { Note, Tag, Task, TimeValue } from '../types';
+import { arrangeTasks } from './reorder';
 
 const HM = /^\d{1,2}:\d{2}$/;
 
@@ -22,7 +23,7 @@ export const sortTasks = (tasks: Task[]): Task[] => [...tasks].sort(compareTasks
 
 /** 某一天、某個分類要顯示的事項（已排序、不含已刪除） */
 export function visibleTasks(tasks: Task[], day: string, tag: Tag): Task[] {
-  return sortTasks(
+  return arrangeTasks(
     tasks.filter(
       (t) =>
         !t.deletedAt &&

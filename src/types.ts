@@ -25,6 +25,7 @@ export interface Task {
   done: boolean;
   doneAt?: number;
   leadMinutes?: number; // 這一件事自己的提前提醒分鐘；沒有就用設定裡的預設
+  order?: number; // 長按拖動排過的順序（同一天、同一時段內比較）；沒有就照時間
   important?: boolean; // 高度重要：卡片上分類右邊顯示紅字「重要」
   delayDays: number; // 累計延後天數，> 0 時顯示「延 N 天」
   createdAt: number;

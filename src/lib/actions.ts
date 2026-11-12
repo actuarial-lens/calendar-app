@@ -4,6 +4,7 @@ import { addDays, dayLabel } from './dates';
 import type { EditorForm } from './editor';
 import { formTime } from './editor';
 import type { Note, Task } from '../types';
+import { dropOrder, timeGroup } from './reorder';
 import { endSeries, importantForFuture, repeatChanged, repeatFromForm, setImportant } from './repeat';
 
 const withTask = (t: Task): Action['changes'] => ({ ...emptyChanges(), putTasks: [t] });
@@ -22,7 +23,7 @@ export function restoreTask(t: Task, now: number): Action {
 export function delayTask(t: Task, now: number): Action {
   const date = addDays(t.date, 1);
   return {
-    changes: withTask({ ...t, date, delayDays: t.delayDays + 1, updatedAt: now }),
+    changes: withTask({ ...dropOrder(t), date, delayDays: t.delayDays + 1, updatedAt: now }),
     message: '已延到 ' + dayLabel(date),
   };
 }
@@ -31,7 +32,7 @@ export function delayTask(t: Task, now: number): Action {
 export function undelayTask(t: Task, now: number): Action {
   const date = addDays(t.date, -t.delayDays);
   return {
-    changes: withTask({ ...t, date, delayDays: 0, updatedAt: now }),
+    changes: withTask({ ...dropOrder(t), date, delayDays: 0, updatedAt: now }),
     message: '已恢復到 ' + dayLabel(date),
   };
 }
@@ -106,7 +107,9 @@ export function saveForm(
   }
   const moved = existing.date !== form.date;
   // 自己改了日期就當作重新安排，不再算「延後」
-  const { leadMinutes: _lead, ...existingRest } = existing;
+  // 換了日期或時段，手動排的順序不再適用
+  const regrouped = moved || timeGroup(existing.time) !== timeGroup(time);
+  const { leadMinutes: _lead, ...existingRest } = regrouped ? dropOrder(existing) : existing;
   let base: Task = setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important);
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
   // 重複事項選了「未來每一次」：整組設定跟著改；「僅限這次」只改這一筆，整組設定不動

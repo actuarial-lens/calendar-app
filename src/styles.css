@@ -116,6 +116,7 @@ input::placeholder { color: #7A7F86; }
   box-shadow: 0 1px 0 rgba(34, 38, 43, 0.06);
 }
 .card {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; /* 長按拖動時不要選字、不要跳選單 */
   background: var(--card);
   padding: 16px 18px;
   display: flex; flex-direction: column; gap: 8px;
@@ -436,6 +437,14 @@ input::placeholder { color: #7A7F86; }
 /* 事項、隨手記增減：展開／收合 */
 .collapse { display: grid; grid-template-rows: 1fr; }
 .collapse-inner { min-height: 0; overflow: hidden; }
+/* 長按拿起來的卡片：稍微放大、加陰影 */
+.collapse.lifted .collapse-inner { overflow: visible; }
+.reordering .swipe-actions { visibility: hidden; } /* 移動中卡片邊緣不要透出後面的按鈕 */
+.collapse.lifted .card-wrap {
+  transform: scale(1.03); box-shadow: 0 10px 28px rgba(34, 38, 43, 0.18);
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease;
+}
+.collapse .card-wrap { transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease; }
 .task-slot { padding-bottom: 10px; }
 .collapse.enter { animation: expand 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .collapse.exit { animation: collapse 0.26s ease both; pointer-events: none; }

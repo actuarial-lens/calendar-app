@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { Phase } from '../lib/animatedList';
 import type { Task } from '../types';
 import { REPEAT_LABEL } from '../lib/repeat';
@@ -13,11 +14,14 @@ interface Props {
   openKey: string | null;
   onOpenChange: (id: string | null) => void;
   onEdit: () => void;
+  onLongPress?: (y: number) => void;
+  dragStyle?: CSSProperties;
+  lifted?: boolean;
 }
 
-export function TaskCard({ task, phase, open, anyOpen, actions, startActions, openKey, onOpenChange, onEdit }: Props) {
+export function TaskCard({ task, phase, open, anyOpen, actions, startActions, openKey, onOpenChange, onEdit, onLongPress, dragStyle, lifted }: Props) {
   return (
-    <div className={'collapse ' + phase}>
+    <div className={'collapse ' + phase + (lifted ? ' lifted' : '')} data-task-id={task.id} style={dragStyle}>
       <div className="collapse-inner task-slot">
         <SwipeRow
           id={task.id}
@@ -28,6 +32,7 @@ export function TaskCard({ task, phase, open, anyOpen, actions, startActions, op
           startOpen={openKey === task.id + START_SUFFIX}
           onOpenChange={onOpenChange}
           onTap={onEdit}
+          onLongPress={onLongPress}
           wrapClass="card-wrap"
           frontClass={'card' + (task.done ? ' done' : '')}
         >

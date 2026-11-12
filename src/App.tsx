@@ -21,6 +21,8 @@ import { loadSettings, saveSettings } from './db/settings';
 import { useLive } from './db/useLive';
 import * as A from './lib/actions';
 import { deleteSeries, withRepeats } from './lib/repeat';
+import { reorderTask, timeGroup } from './lib/reorder';
+import { useTaskDrag } from './lib/useTaskDrag';
 import type { Action, Changes } from './lib/changes';
 import { useAnimatedList } from './lib/animatedList';
 import { addDays, rangeText, weekDates } from './lib/dates';
@@ -111,6 +113,13 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const listKey = day + '|' + tag;
   const taskEntries = useAnimatedList(tasks ? visibleTasks(tasks, day, tag) : [], listKey, ready);
   const noteEntries = useAnimatedList(notes ? visibleNotes(notes, day) : [], day, ready);
+
+  const shownIds = taskEntries.filter((e) => e.phase !== 'exit').map((e) => e.item.id);
+  const taskDrag = useTaskDrag(shownIds, (id, prevId, nextId) => {
+    const t = tasks?.find((x) => x.id === id);
+    const a = t && tasks ? reorderTask(tasks, t, prevId, nextId, Date.now()) : null;
+    if (a) void run(a);
+  });
 
   const marks = useMemo(() => {
     const s = new Set<string>();
@@ -237,7 +246,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
       <TagBar tag={tag} onPick={(t) => { setTag(t); setOpenId(null); }} />
 
       <main className="main">
-        <div className="task-list fade-in" key={listKey}>
+        <div className={'task-list fade-in' + (taskDrag.active ? ' reordering' : '')} key={listKey}>
           {taskEntries.map(({ item: t, phase }) => (
             <TaskCard
               key={t.id}
@@ -250,6 +259,18 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
               openKey={openId}
               onOpenChange={setOpenId}
               onEdit={() => setForm(formFromTask(t))}
+              onLongPress={
+                t.done || phase === 'exit'
+                  ? undefined
+                  : (y) => {
+                      setOpenId(null);
+                      const g = timeGroup(t.time);
+                      const ids = taskEntries.filter((e) => e.phase !== 'exit' && !e.item.done && timeGroup(e.item.time) === g).map((e) => e.item.id);
+                      taskDrag.start(t.id, ids, y);
+                    }
+              }
+              dragStyle={taskDrag.styleFor(t.id)}
+              lifted={taskDrag.draggingId === t.id}
             />
           ))}
         </div>

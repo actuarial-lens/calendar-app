@@ -17,12 +17,16 @@ interface Props {
   startOpen?: boolean;
   onOpenChange: (id: string | null) => void;
   onTap?: () => void;
+  /** 長按（沒移動）時呼叫，帶著手指的 y 座標；沒有就不能長按 */
+  onLongPress?: (y: number) => void;
   wrapClass: string;
   frontClass: string;
   children: ReactNode;
 }
 
 const BTN_W = 64;
+/** 按住多久算長按（毫秒） */
+export const LONG_PRESS_MS = 450;
 /** 右滑打開時，回報給外面的 key（id 後面加這個符號） */
 export const START_SUFFIX = '>';
 /** 拉過按鈕區之後的阻力（越小越難拉）與最多能多拉的距離 */
@@ -46,13 +50,14 @@ export function swipeX(base: number, dx: number, W: number, Ws = 0): number {
  * 左滑列。先判斷手勢方向（水平或垂直）才決定要不要跟著手指動，
  * 所以垂直捲動不會誤觸左滑。往左滑超過按鈕區一半才停在打開狀態。
  */
-export function SwipeRow({ id, open, anyOpen, actions, startActions = [], startOpen = false, onOpenChange, onTap, wrapClass, frontClass, children }: Props) {
+export function SwipeRow({ id, open, anyOpen, actions, startActions = [], startOpen = false, onOpenChange, onTap, onLongPress, wrapClass, frontClass, children }: Props) {
   const W = actions.length * BTN_W;
   const Ws = startActions.length * BTN_W;
   const gesture = useRef<{ x0: number; y0: number; base: number; axis: 'x' | 'y' | null } | null>(null);
   const dxRef = useRef(0);
   const wasOpenRef = useRef(false); // 按下去的當下，有沒有任何一列是打開的
   const swipedRef = useRef(false); // 這次手勢是不是水平滑動（是的話放開後的 click 要忽略）
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [pressed, setPressed] = useState(false); // 手指按著、還沒判斷成滑動時，給一點按下的回饋
@@ -61,6 +66,7 @@ export function SwipeRow({ id, open, anyOpen, actions, startActions = [], startO
   const x = dragging ? swipeX(base, dx, W, Ws) : base;
 
   const finish = () => {
+    clearTimeout(pressTimer.current);
     const g = gesture.current;
     gesture.current = null;
     setPressed(false);
@@ -118,6 +124,17 @@ export function SwipeRow({ id, open, anyOpen, actions, startActions = [], startO
           swipedRef.current = false;
           dxRef.current = 0;
           setPressed(true);
+          clearTimeout(pressTimer.current);
+          if (onLongPress) {
+            const y = e.clientY;
+            pressTimer.current = setTimeout(() => {
+              if (!gesture.current || gesture.current.axis) return;
+              gesture.current = null; // 接下來交給拖動
+              swipedRef.current = true; // 放開後的 click 不要打開編輯
+              setPressed(false);
+              onLongPress(y);
+            }, LONG_PRESS_MS);
+          }
         }}
         onPointerMove={(e) => {
           const g = gesture.current;
@@ -127,6 +144,7 @@ export function SwipeRow({ id, open, anyOpen, actions, startActions = [], startO
           if (!g.axis) {
             if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
             g.axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+            clearTimeout(pressTimer.current);
             setPressed(false);
             if (g.axis === 'x') {
               swipedRef.current = true;
