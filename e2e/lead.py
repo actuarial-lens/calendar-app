@@ -18,17 +18,29 @@ with sync_playwright() as p:
     page.get_by_role('button', name='指定', exact=True).click(); page.wait_for_selector('.lead-row')
     on = page.locator('.lead-row button[aria-pressed="true"]').inner_text()
     print('編輯時預設選中:', on); assert on == '30'
+    reset = page.get_by_role('button', name='恢復預設通知時間（30 分鐘）')
+    assert reset.is_disabled() and page.locator('.lead-warn').count() == 0 and page.locator('.lead-notice').count() == 0
     page.locator('.lead-row').get_by_role('button', name='10', exact=True).click()
     assert page.locator('.lead-row button[aria-pressed="true"]').inner_text() == '10'
+    assert page.locator('.lead-notice').count() == 1 and reset.is_enabled()
+    print('紅字:', page.locator('.lead-warn').inner_text())
     page.get_by_role('dialog').get_by_role('button', name='記下').click(); page.wait_for_timeout(600)
-    # 重新打開那一筆：仍是 10
+    # 重新打開：仍是 10、紅字在、說明框不會自己再跳出、按鈕可按
     page.locator('.card', has_text='提前測試').first.click(); page.wait_for_selector('.lead-row')
     on = page.locator('.lead-row button[aria-pressed="true"]').inner_text()
     print('重開後選中:', on, '| 錯誤', errs); assert on == '10'
-    # 點回 30（= 預設）→ 存檔後再開仍是 30
+    assert page.locator('.lead-warn').count() == 1 and page.locator('.lead-notice').count() == 0 and reset.is_enabled()
+    # 選 30（跟預設一樣的數字）仍然是獨立設定
     page.locator('.lead-row').get_by_role('button', name='30', exact=True).click()
+    assert page.locator('.lead-warn').count() == 1 and page.locator('.lead-notice').count() == 1
+    page.screenshot(path='/tmp/lead.png')
     page.get_by_role('button', name='儲存').click(); page.wait_for_timeout(600)
     page.locator('.card', has_text='提前測試').first.click(); page.wait_for_selector('.lead-row')
-    assert page.locator('.lead-row button[aria-pressed="true"]').inner_text() == '30'
-    page.screenshot(path='/tmp/lead.png')
+    assert page.locator('.lead-warn').count() == 1, '選 30 也算獨立'
+    # 恢復預設
+    reset.click()
+    assert page.locator('.lead-warn').count() == 0 and reset.is_disabled()
+    page.get_by_role('button', name='儲存').click(); page.wait_for_timeout(600)
+    page.locator('.card', has_text='提前測試').first.click(); page.wait_for_selector('.lead-row')
+    assert page.locator('.lead-warn').count() == 0 and reset.is_disabled()
     print('OK'); b.close()

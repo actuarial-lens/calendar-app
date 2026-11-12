@@ -23,6 +23,7 @@ export function EditSheet({ form, closing, today, defaultLead, onChange, onCance
   const quick = quickDates(today);
   const isQuick = quick.includes(form.date);
   const [shake, setShake] = useState(false);
+  const [leadNotice, setLeadNotice] = useState(false); // 剛改成獨立通知時間時跳出的說明框
   const [picking, setPicking] = useState<'date' | 'until' | null>(null); // 正在用月曆選哪一個日期
   const pickP = usePresence(picking, 300);
   const canSave = form.title.trim().length > 0;
@@ -93,12 +94,32 @@ export function EditSheet({ form, closing, today, defaultLead, onChange, onCance
                     type="button"
                     className="chip"
                     aria-pressed={(form.lead ?? defaultLead) === m}
-                    onClick={() => onChange({ lead: m === defaultLead ? null : m })}
+                    onClick={() => {
+                      onChange({ lead: m });
+                      setLeadNotice(true);
+                    }}
                   >
                     {m}
                   </button>
                 ))}
               </div>
+              {form.lead !== null && <p className="lead-warn">獨立通知時間，未跟隨預設通知時間。</p>}
+              {leadNotice && form.lead !== null && (
+                <div className="lead-notice" role="status">
+                  已獨立設定通知時間，若要恢復跟隨預設通知時間，請點擊「恢復預設通知時間」。
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn-outline lead-reset"
+                disabled={form.lead === null}
+                onClick={() => {
+                  onChange({ lead: null });
+                  setLeadNotice(false);
+                }}
+              >
+                恢復預設通知時間（{defaultLead} 分鐘）
+              </button>
             </div>
           )}
         </div>

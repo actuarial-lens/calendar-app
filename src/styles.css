@@ -371,6 +371,14 @@ input::placeholder { color: #7A7F86; }
   background: var(--bg); font-family: var(--mono); font-size: 16px; color: var(--text);
 }
 .lead-row { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.lead-warn { margin: 0; font-size: 13px; color: #B3261E; }
+.lead-notice {
+  padding: 10px 12px; border-radius: 12px; border: 1px solid var(--blue);
+  background: rgba(46, 74, 107, 0.06); font-size: 13px; line-height: 1.6; color: var(--text);
+  animation: lead-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes lead-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+.lead-reset { flex: none; width: 100%; }
 .lead-label { font-size: 13px; color: var(--text-2); }
 .text-field {
   width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px;
