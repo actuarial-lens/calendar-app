@@ -46,6 +46,12 @@ async def main():
                 pc = ink_center(a, int((bx['y'] + ins - cy) * SCALE), int((bx['y'] + bx['height'] - ins - cy) * SCALE),
                                 int((bx['x'] + min(bx['height'] / 2, bx['width'] * .3) - cx) * SCALE), int((bx['x'] + bx['width'] - min(bx['height'] / 2, bx['width'] * .3) - cx) * SCALE))
                 res.append((title, name, round((pc - cc) / SCALE, 2), round(bx['y'] + bx['height'] / 2 - (cat['y'] + cat['height'] / 2), 2)))
+        # 重要且未完成的卡片底色（A：#FBF0EE）；沒標重要的維持 --card
+        bgs = await page.evaluate("()=>[...document.querySelectorAll('.card')].map(c=>[c.querySelector('.title').textContent, getComputedStyle(c).backgroundColor])")
+        print('卡片底色:', bgs)
+        want = {'全部都有': 'rgb(251, 240, 238)', '只有重要': 'rgb(251, 240, 238)', '只有截止': 'rgb(251, 250, 247)', '只有延後': 'rgb(251, 250, 247)'}
+        for ti, col in bgs:
+            if ti in want and col != want[ti]: print('FAIL 底色', ti, col); res.append((ti, '底色', 99, 0))
         bad = 0
         for title, name, d, boxd in res:
             ok = abs(d) <= 0.5; bad += not ok

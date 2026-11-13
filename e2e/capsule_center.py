@@ -62,7 +62,7 @@ async def main():
         await measure('提示框 已確認/不再通知/已完成/全部移至本日', S('.alerts-cap'))
         await measure('提示框 已過期', S('.alerts-expired'), 1.5)
         await measure('分類頁籤', S('.tag'))
-        # 卡片上的 重要／截止／延 N 天 膠囊：字要和左邊分類文字等高（不是和膠囊框置中），由 pill_align.py 量
+        await measure('卡片 重要/截止/延N天 膠囊（字在框正中間）', S('.card .pill'), 2)  # 另外 pill_align.py 量「字和左邊分類文字等高」
         await measure('週列日期', S('.week .day'), 4)
         await hide.evaluate('e=>e.remove()')
         await measure('底部 新增事項', S('.btn-new'))

@@ -34,7 +34,7 @@ export function TaskCard({ task, phase, open, anyOpen, actions, startActions, op
           onTap={onEdit}
           onLongPress={onLongPress}
           wrapClass="card-wrap"
-          frontClass={'card' + (task.done ? ' done' : '')}
+          frontClass={'card' + (task.done ? ' done' : '') + (task.important && !task.done ? ' important' : '')}
         >
           <div className="row1">
             <div className="left">
