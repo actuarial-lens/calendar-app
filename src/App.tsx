@@ -32,6 +32,7 @@ import { addDays, rangeText } from './lib/dates';
 import { formFromTask, newForm, type EditorForm } from './lib/editor';
 import { newId } from './lib/id';
 import type { Reminder } from './lib/reminders';
+import { clearReloadState, setReloadSnapshot } from './lib/reloadState';
 import { dayCounts, loadLevel, visibleNotes, visibleTasks } from './lib/sort';
 import { isISODate } from './lib/swLogic';
 import { usePresence } from './lib/usePresence';
@@ -77,6 +78,11 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
     prevToday.current = today;
     if (prev !== today) setDay((d) => (d === prev ? today : d));
   }, [today]);
+
+  // 讓 main.tsx 在新版部署、重新整理前拿得到目前的畫面狀態
+  useEffect(() => {
+    setReloadSnapshot({ missed, day });
+  }, [missed, day]);
 
   // 補排重複事項；沒有需要補的時候不會寫入，所以不會一直循環
   useEffect(() => {
@@ -250,7 +256,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
         <button type="button" className="range" aria-label="回到今天" onClick={() => pickDay(today)}>{rangeText(day)}</button>
       </header>
 
-      {missedP.shown && <MissedBlock items={missedP.shown} closing={missedP.closing} today={today} onClose={() => setMissed([])} />}
+      {missedP.shown && <MissedBlock items={missedP.shown} closing={missedP.closing} today={today} onClose={() => { setMissed([]); clearReloadState(sessionStorage); }} />}
       {alertsP.shown && (
         <AlertBox
           alerts={alertsP.shown}

@@ -19,6 +19,8 @@ import { isISODate } from './lib/swLogic';
 import { collectBootMissed } from './notify/boot';
 import type { Reminder } from './lib/reminders';
 import { todayISO } from './lib/dates';
+import { getReloadSnapshot, mergeMissed, saveReloadState, takeReloadState } from './lib/reloadState';
+import { createUpdateReloader } from './lib/updateReload';
 
 async function boot() {
   let initialMissed: Reminder[] = [];
@@ -36,7 +38,10 @@ async function boot() {
 
   // 點通知打開 App 時，網址帶 ?date=YYYY-MM-DD，跳到那一天
   const param = new URLSearchParams(location.search).get('date');
-  const initialDay = isISODate(param) ? param : undefined;
+  // 新版部署後的重新整理：把重新整理前的「錯過的提醒」與日期接回來
+  const saved = takeReloadState(sessionStorage);
+  initialMissed = mergeMissed(initialMissed, saved.missed);
+  const initialDay = isISODate(param) ? param : saved.day;
   if (param !== null) history.replaceState(null, '', location.pathname);
 
   createRoot(document.getElementById('root')!).render(
@@ -48,4 +53,12 @@ async function boot() {
 
 boot();
 
-if (import.meta.env.PROD) registerSW({ immediate: true });
+if (import.meta.env.PROD) {
+  // 新版 Service Worker 接手後不馬上重新整理，等使用者離開 App 才做（不會吃掉打到一半的字）
+  const reloader = createUpdateReloader({
+    doc: document,
+    save: () => saveReloadState(sessionStorage, getReloadSnapshot()),
+    reload: () => location.reload(),
+  });
+  registerSW({ immediate: true, onNeedReload: reloader.needReload });
+}
