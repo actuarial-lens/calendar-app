@@ -73,7 +73,7 @@ export function planRepeats(tasks: Task[], today: string, now: number, newId: ()
         time: tpl.time,
         category: tpl.category,
         title: tpl.title,
-        note: last.note,
+        note: tpl.note ?? last.note, // 舊資料的範本沒有 note：沿用最後一筆
         ...(tpl.leadMinutes !== undefined ? { leadMinutes: tpl.leadMinutes } : {}),
         // 「重要」看整組的設定，不看範本那一筆（範本可能是「僅限這次」改過的）
         ...(r.important ? { important: true } : {}),
@@ -185,17 +185,18 @@ export function setImportant<T extends { important?: boolean }>(x: T, important:
   return setFlag(x, 'important', important);
 }
 
-/** 一筆事項的標題、時間、分類、提前提醒 → 整組的範本 */
-export function tplOf(t: Pick<Task, 'title' | 'time' | 'category' | 'leadMinutes'>): SeriesTpl {
-  return { title: t.title, time: t.time, category: t.category, ...(t.leadMinutes !== undefined ? { leadMinutes: t.leadMinutes } : {}) };
+/** 一筆事項的標題、時間、分類、提前提醒、備註 → 整組的範本 */
+export function tplOf(t: Pick<Task, 'title' | 'time' | 'category' | 'leadMinutes'> & { note?: string }): SeriesTpl {
+  return { title: t.title, time: t.time, category: t.category, ...(t.leadMinutes !== undefined ? { leadMinutes: t.leadMinutes } : {}), ...(t.note !== undefined ? { note: t.note } : {}) };
 }
 
 /** 整組目前的範本：有存就用存的；舊資料沒有就和 planRepeats 一樣看原定日期最晚的那一筆 */
 export function currentTpl(all: Task[], t: Task): SeriesTpl {
-  if (t.repeat?.tpl) return t.repeat.tpl;
   let last = t;
   for (const x of all) if (x.repeat?.seriesId === t.repeat?.seriesId && x.repeat!.occurrence > last.repeat!.occurrence) last = x;
-  return last.repeat?.tpl ?? tplOf(last);
+  const tpl = t.repeat?.tpl ?? last.repeat?.tpl ?? tplOf(last);
+  // 舊範本沒有 note：存檔時固定成「目前最後一筆的備註」，這樣只改最後一筆的備註不會影響之後新排的
+  return tpl.note === undefined ? { ...tpl, note: last.note } : tpl;
 }
 
 /** 編輯面板上改了哪些整組可共用的欄位（只放有改的；lead: null = 改回跟隨預設） */
@@ -204,6 +205,7 @@ export interface TplPatch {
   time?: TimeValue;
   category?: Category;
   lead?: number | null;
+  note?: string;
 }
 
 export function tplPatch(existing: Task, form: EditorForm): TplPatch {
@@ -214,6 +216,7 @@ export function tplPatch(existing: Task, form: EditorForm): TplPatch {
   if (time !== existing.time) p.time = time;
   if (form.category !== existing.category) p.category = form.category;
   if (form.lead !== (existing.leadMinutes ?? null)) p.lead = form.lead;
+  if (form.note.trim() !== existing.note) p.note = form.note.trim();
   return p;
 }
 
@@ -231,6 +234,7 @@ export function applyPatch<T extends Task | SeriesTpl>(x: T, p: TplPatch): T {
   let out = { ...x } as T & { order?: number };
   if (p.title !== undefined) out.title = p.title;
   if (p.category !== undefined) out.category = p.category;
+  if (p.note !== undefined) out.note = p.note;
   if (p.time !== undefined && p.time !== out.time) {
     out.time = p.time;
     delete out.order;

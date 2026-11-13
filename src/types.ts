@@ -23,6 +23,7 @@ export interface SeriesTpl {
   time: TimeValue;
   category: Category;
   leadMinutes?: number;
+  note?: string; // 備註；舊資料的範本沒有，新排的沿用最後一筆
 }
 
 export interface Task {

@@ -8,6 +8,7 @@ export interface EditorForm {
   mode: 'new' | 'edit';
   id: string | null;
   title: string;
+  note: string; // 備註（可多行）
   date: string;
   category: Category;
   timeMode: TimeMode;
@@ -20,7 +21,7 @@ export interface EditorForm {
   importantScope: ImportantScope;
   deadline: boolean;
   deadlineScope: ImportantScope; // 同上，切換「截止日」時選的範圍
-  /** 重複事項改了標題／時間／分類／提前提醒，存檔時選的範圍（日期一律只改這一筆） */
+  /** 重複事項改了標題／時間／分類／提前提醒／備註，存檔時選的範圍（日期一律只改這一筆） */
   editScope: ImportantScope;
 }
 
@@ -31,7 +32,7 @@ export const DEFAULT_PICK_TIME = '09:00';
 
 /** 新增：空白，日期預設為目前看的那天，分類預設待辦 */
 export function newForm(day: string): EditorForm {
-  return { mode: 'new', id: null, title: '', date: day, category: '待辦', timeMode: '', timeVal: DEFAULT_PICK_TIME, repeat: 'none', until: '', lead: null, important: false, importantScope: 'one', deadline: false, deadlineScope: 'one', editScope: 'one' };
+  return { mode: 'new', id: null, title: '', note: '', date: day, category: '待辦', timeMode: '', timeVal: DEFAULT_PICK_TIME, repeat: 'none', until: '', lead: null, important: false, importantScope: 'one', deadline: false, deadlineScope: 'one', editScope: 'one' };
 }
 
 /** 編輯：帶入原本的內容 */
@@ -41,6 +42,7 @@ export function formFromTask(t: Task): EditorForm {
     mode: 'edit',
     id: t.id,
     title: t.title,
+    note: t.note,
     date: t.date,
     category: t.category,
     timeMode: isHM ? 'pick' : (t.time as TimeMode),

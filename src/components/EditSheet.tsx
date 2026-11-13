@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { quickDates, type EditorForm, type TimeMode } from '../lib/editor';
 import { CATEGORIES, LEAD_OPTIONS, type Category } from '../types';
 import { repeatHint, repeatStart, type Flag, type RepeatOrigin } from '../lib/repeat';
@@ -38,6 +38,14 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
   const askImp = askFlag !== null;
   const [askEdit, setAskEdit] = useState(false); // 重複事項改了內容，按「儲存」時的詢問框
   const editP = usePresence(askEdit ? true : null, 300);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  // 備註：預設 2 行、隨內容長高，超過 6 行（CSS 的 max-height）就捲動
+  useLayoutEffect(() => {
+    const el = noteRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 2 + 'px'; // +2：上下框線
+  }, [form.note]);
   const canSave = form.title.trim().length > 0;
   const isNew = form.mode === 'new';
 
@@ -62,6 +70,20 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
             value={form.title}
             onChange={(e) => onChange({ title: e.target.value })}
             placeholder="例如：與設計組對稿"
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="ed-note" className="field-label">備註</label>
+          <textarea
+            id="ed-note"
+            ref={noteRef}
+            className="text-input note-area"
+            rows={2}
+            maxLength={1000}
+            value={form.note}
+            onChange={(e) => onChange({ note: e.target.value })}
+            placeholder="地點、要帶的東西…（選填）"
           />
         </div>
 
@@ -263,7 +285,7 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
         heading="修改重複事項"
         title={form.title.trim() || '這件事'}
         freq={seriesFreq}
-        hint="「未來每一次」會改這一筆和之後還沒完成的每一筆（標題、時間、分類、提前提醒）；日期只改這一筆。"
+        hint="「未來每一次」會改這一筆和之後還沒完成的每一筆（標題、時間、分類、提前提醒、備註）；日期只改這一筆。"
         closing={editP.closing}
         onCancel={() => setAskEdit(false)}
         onOne={() => {

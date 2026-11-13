@@ -86,6 +86,7 @@ export function saveForm(
   const title = form.title.trim();
   if (!title) return null;
   const time = formTime(form);
+  const note = form.note.trim();
   if (form.mode === 'new' || !existing) {
     const task: Task = {
       id: newTaskId,
@@ -93,7 +94,7 @@ export function saveForm(
       time,
       category: form.category,
       title,
-      note: '',
+      note,
       done: false,
       delayDays: 0,
       createdAt: now,
@@ -112,7 +113,7 @@ export function saveForm(
   // 時間改了也拿掉：讓它照新的時間重新插入
   const regrouped = moved || existing.time !== time;
   const { leadMinutes: _lead, ...existingRest } = regrouped ? dropOrder(existing) : existing;
-  let base: Task = setFlag(setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important), 'deadline', form.deadline);
+  let base: Task = setFlag(setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, note, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important), 'deadline', form.deadline);
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
   // 重複事項選了「未來每一次」：整組設定跟著改；「僅限這次」只改這一筆，整組設定不動
   const future = !!existing.repeat && form.importantScope === 'future';

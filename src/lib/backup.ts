@@ -35,7 +35,7 @@ const isCat = (v: unknown) => v === '會議' || v === '待辦' || v === '私人'
 function validTpl(v: unknown): boolean {
   if (v === undefined) return true;
   const o = v as Record<string, unknown>;
-  return !!o && typeof o === 'object' && isStr(o.title) && isStr(o.time) && isCat(o.category) && (o.leadMinutes === undefined || isNum(o.leadMinutes));
+  return !!o && typeof o === 'object' && isStr(o.title) && isStr(o.time) && isCat(o.category) && (o.leadMinutes === undefined || isNum(o.leadMinutes)) && (o.note === undefined || isStr(o.note));
 }
 
 function validTask(t: unknown): t is Task {

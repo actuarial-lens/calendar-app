@@ -62,7 +62,7 @@ describe('僅限這次', () => {
     const put = save(c, { timeVal: '15:00' }, all, 'one').changes.putTasks;
     expect(put).toHaveLength(1);
     expect(put[0]).toMatchObject({ id: 'c', time: '15:00' });
-    expect(put[0].repeat!.tpl).toEqual({ title: '週會', time: '10:00', category: '會議' });
+    expect(put[0].repeat!.tpl).toEqual({ title: '週會', time: '10:00', category: '會議', note: '' });
     const more = future(after(all, put));
     expect(more.length).toBeGreaterThan(0);
     expect(more.every((x) => x.time === '10:00')).toBe(true);
@@ -138,7 +138,7 @@ describe('未來每一次', () => {
     const all = series();
     all[3] = { ...all[3], category: '私人' }; // 舊版改過最後一筆
     const put = byId(save(all[1], { timeVal: '15:00' }, all, 'future').changes.putTasks);
-    expect(put.get('a')!.repeat!.tpl).toEqual({ title: '週會', time: '15:00', category: '私人' });
+    expect(put.get('a')!.repeat!.tpl).toEqual({ title: '週會', time: '15:00', category: '私人', note: '' });
   });
 
   it('沒改任何內容卻選了未來每一次：只存這一筆', () => {
@@ -151,7 +151,7 @@ describe('未來每一次', () => {
 describe('整組範本的保存', () => {
   it('新增重複事項就存 tpl', () => {
     const t = saveForm({ ...newForm(TODAY), title: '晨跑', timeMode: 'pick', timeVal: '07:00', category: '私人', lead: 15, repeat: 'weekly' }, undefined, NOW, 'n1', [], 's9')!.changes.putTasks[0];
-    expect(t.repeat!.tpl).toEqual({ title: '晨跑', time: '07:00', category: '私人', leadMinutes: 15 });
+    expect(t.repeat!.tpl).toEqual({ title: '晨跑', time: '07:00', category: '私人', leadMinutes: 15, note: '' });
     expect(future([t]).every((x) => x.time === '07:00' && x.leadMinutes === 15)).toBe(true);
   });
 
