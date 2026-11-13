@@ -460,6 +460,21 @@ input::placeholder { color: #7C837E; }
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .text-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.14); outline: none; }
+.value.bad { color: #B3261E; text-align: right; }
+.recovery-code {
+  margin: 0; padding: 16px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--border);
+  font-family: var(--mono); font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-align: center; line-height: 1.5;
+  user-select: all; -webkit-user-select: all; word-break: break-all;
+}
+.code-copy { display: flex; align-items: center; gap: 12px; }
+.code-copy .btn-outline { flex: none; width: 96px; }
+.code-input { font-family: var(--mono); letter-spacing: 0.04em; font-size: 15px; }
+.restore-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.restore-item {
+  height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border); background: transparent;
+  color: var(--text); font-size: 14px; text-align: left;
+}
+.restore-item[aria-checked='true'] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .help { margin: 0; padding: 12px 18px 12px 34px; font-size: 13px; line-height: 1.7; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; }
 .version { margin: 0; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 
@@ -565,7 +580,7 @@ input { caret-color: var(--blue); accent-color: var(--blue); }
 .field-hint { margin: 2px 2px 0; font-size: 12px; line-height: 1.6; color: var(--text-2); }
 .del-text { margin: 0; font-size: 15px; line-height: 1.7; }
 .del-actions { display: flex; flex-direction: column; gap: 10px; }
-.del-actions .btn-ghost, .del-actions .btn-danger { flex: none; width: 100%; height: 48px; border-radius: 14px; font-size: 15px; padding: 0 0 1px; }
+.del-actions .btn-ghost, .del-actions .btn-primary, .del-actions .btn-danger { flex: none; width: 100%; height: 48px; border-radius: 14px; font-size: 15px; padding: 0 0 1px; }
 .btn-danger { border: none; background: #A4554B; color: #FFFFFF; transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), filter 0.15s ease; touch-action: manipulation; }
 .btn-danger:active { transform: scale(0.97); filter: brightness(0.94); }
 .btn-text { height: 44px; padding: 0 8px 1px; border: none; background: none; color: var(--text-2); font-size: 15px; touch-action: manipulation; }

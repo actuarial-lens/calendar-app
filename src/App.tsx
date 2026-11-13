@@ -40,6 +40,7 @@ import { isISODate } from './lib/swLogic';
 import { usePresence } from './lib/usePresence';
 import { useToday } from './lib/useToday';
 import { enableNotifications, sendTestNotification } from './notify/enable';
+import { useCloudBackup } from './notify/useCloudBackup';
 import { useReminders } from './notify/useReminders';
 import type { Note, Tag, Task } from './types';
 
@@ -118,6 +119,8 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   useEffect(() => {
     if (tasks) void ensureRepeats(db, today);
   }, [tasks, today]);
+
+  const cloud = useCloudBackup({ tasks, notes, settings });
 
   useReminders({
     tasks,
@@ -370,6 +373,8 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
         <SettingsPage
           settings={settings}
           closing={settingsP.closing}
+          today={today}
+          cloud={{ state: cloud.state, actions: cloud.actions, liveCount: tasks.filter((t) => !t.deletedAt).length + notes.filter((n) => !n.deletedAt).length }}
           onChange={(patch) => void saveSettings(db, patch)}
           onEnable={() => enableNotifications(db)}
           onTest={sendTestNotification}

@@ -38,7 +38,7 @@ function validTpl(v: unknown): boolean {
   return !!o && typeof o === 'object' && isStr(o.title) && isStr(o.time) && isCat(o.category) && (o.leadMinutes === undefined || isNum(o.leadMinutes)) && (o.note === undefined || isStr(o.note));
 }
 
-function validTask(t: unknown): t is Task {
+export function validTask(t: unknown): t is Task {
   const o = t as Record<string, unknown>;
   return (
     !!o && typeof o === 'object' &&
@@ -53,7 +53,7 @@ function validTask(t: unknown): t is Task {
     (o.repeat === undefined || (!!o.repeat && typeof o.repeat === 'object' && validTpl((o.repeat as Record<string, unknown>).tpl)))
   );
 }
-function validNote(n: unknown): n is Note {
+export function validNote(n: unknown): n is Note {
   const o = n as Record<string, unknown>;
   return !!o && typeof o === 'object' && isStr(o.id) && o.id !== '' && isDate(o.date) && isStr(o.text) && isNum(o.createdAt) && isNum(o.updatedAt);
 }
@@ -88,7 +88,7 @@ export interface ImportPlan {
 }
 
 /** 合併：id 相同時，較新（updatedAt 大）的留下；現有資料絕不刪除。 */
-export function planImport(backup: Backup, tasks: Task[], notes: Note[]): ImportPlan {
+export function planImport(backup: Pick<Backup, 'tasks' | 'notes'>, tasks: Task[], notes: Note[]): ImportPlan {
   const haveT = new Map(tasks.map((t) => [t.id, t]));
   const haveN = new Map(notes.map((n) => [n.id, n]));
   const putTasks: Task[] = [];

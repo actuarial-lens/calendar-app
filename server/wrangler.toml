@@ -10,6 +10,12 @@ crons = ["* * * * *"]
 binding = "PUSH_KV"
 id = "把 KV 的 id 貼在這裡"
 
+# 雲端備份（選用）：先在 D1 建立資料庫 calendar-app-backup，再把 id 貼在這裡
+# [[d1_databases]]
+# binding = "BACKUP_DB"
+# database_name = "calendar-app-backup"
+# database_id = "把 D1 的 id 貼在這裡"
+
 [vars]
 VAPID_SUBJECT = "mailto:你的信箱@example.com"
 # 建議填你的 App 網址（不含路徑），只允許它來呼叫：

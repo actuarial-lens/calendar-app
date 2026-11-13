@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { isPushConfigured } from '../notify/push';
 import { isStandalone, notificationPermission, type PermissionState } from '../notify/native';
+import type { CloudBackupState } from '../lib/cloudBackup';
+import type { CloudActions } from '../notify/cloudActions';
 import { LEAD_OPTIONS, type Settings } from '../types';
+import { CloudBackupSection } from './CloudBackupSection';
 
 interface Props {
   settings: Settings;
   closing: boolean;
+  today: string;
+  cloud: { state: CloudBackupState | undefined; actions: CloudActions; liveCount: number };
   onChange: (patch: Partial<Settings>) => void;
   onEnable: () => Promise<string>;
   onTest: () => Promise<string>;
@@ -22,7 +27,7 @@ const PERMISSION_TEXT: Record<PermissionState, string> = {
   unsupported: '不支援',
 };
 
-export function SettingsPage({ settings, closing, onChange, onEnable, onTest, onTestPush, onExport, onImport, onClose }: Props) {
+export function SettingsPage({ settings, closing, today, cloud, onChange, onEnable, onTest, onTestPush, onExport, onImport, onClose }: Props) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [permission, setPermission] = useState<PermissionState>(notificationPermission());
@@ -146,6 +151,8 @@ export function SettingsPage({ settings, closing, onChange, onEnable, onTest, on
             </div>
           </div>
         </section>
+
+        <CloudBackupSection settings={settings} today={today} state={cloud.state} actions={cloud.actions} liveCount={cloud.liveCount} />
 
         <section>
           <h2 className="group-title">資料備份</h2>

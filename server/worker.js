@@ -3,10 +3,13 @@
 // 做的事：
 //   1. 收 App 送來的「接下來幾天的提醒排程」，存在 KV（只存排程與推播訂閱，不存事項本身）
 //   2. 每分鐘檢查一次，到點的提醒用 Web Push 推給那支手機
+//   3. 雲端備份（選用）：App 把「加密過」的資料送來，存在 D1（每個備份代號最近 7 天，每天一份）。
+//      伺服器只看得到加密後的內容與備份代號，沒有還原碼就解不開。
 // 需要的設定（在 Cloudflare 後台設定，見 server/README.md）：
 //   KV 綁定：PUSH_KV
+//   D1 綁定：BACKUP_DB（只有用雲端備份才需要；沒綁定時備份路徑回 501，推播不受影響）
 //   環境變數：VAPID_PUBLIC、VAPID_PRIVATE、VAPID_SUBJECT、APP_SECRET
-//   選用：ALLOWED_ORIGIN（只允許你的 App 網址呼叫）、MAX_USERS（預設 10）
+//   選用：ALLOWED_ORIGIN（只允許你的 App 網址呼叫）、MAX_USERS（預設 10）、MAX_BACKUPS（備份代號上限，預設 20）
 // 沒有任何依賴套件，整個檔案貼上去就能用。
 
 const enc = new TextEncoder();
@@ -14,6 +17,11 @@ const enc = new TextEncoder();
 /** 到點之後最多晚多久還補送（毫秒）。更晚的就不送，App 打開時會列在「錯過的提醒」 */
 export const LATE_MS = 30 * 60 * 1000;
 const MAX_BODY_BYTES = 200 * 1024;
+/** 雲端備份：請求大小、加密內容長度、每個代號保留幾天、代號總數 */
+const MAX_BACKUP_BODY_BYTES = 1_500_000;
+export const MAX_BLOB_CHARS = 1_000_000;
+export const KEEP_DAYS = 7;
+const DEFAULT_MAX_BACKUPS = 20;
 const MAX_REMINDERS = 500;
 const MAX_SEND_PER_USER_PER_RUN = 10;
 
@@ -197,6 +205,8 @@ export async function handleRequest(request, env, now = Date.now(), fetchFn = fe
   const auth = request.headers.get('Authorization') ?? '';
   if (!sameSecret(auth.replace(/^Bearer\s+/i, ''), env.APP_SECRET)) return reply(env, 401, { error: 'auth' });
 
+  if (path.startsWith('/backup/')) return handleBackup(path, request, env, now);
+
   const text = await request.text();
   if (text.length > MAX_BODY_BYTES) return reply(env, 413, { error: 'too large' });
   let body;
@@ -242,6 +252,78 @@ export async function handleRequest(request, env, now = Date.now(), fetchFn = fe
   }
 
   return reply(env, 404, { error: 'not found' });
+}
+
+// ---------- 雲端備份（D1） ----------
+// backups 資料表：id＝備份代號（App 由還原碼算出的 64 個十六進位字元）、day＝手機當地日期、blob＝加密後的內容
+const ID_RE = /^[0-9a-f]{64}$/;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const BLOB_RE = /^[A-Za-z0-9_-]+$/;
+
+async function handleBackup(path, request, env, now) {
+  const db = env.BACKUP_DB;
+  if (!db) return reply(env, 501, { error: 'no-db' });
+  if (!['/backup/put', '/backup/list', '/backup/get', '/backup/delete'].includes(path)) return reply(env, 404, { error: 'not found' });
+
+  const text = await request.text();
+  if (text.length > MAX_BACKUP_BODY_BYTES) return reply(env, 413, { error: 'too large' });
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return reply(env, 400, { error: 'json' });
+  }
+  const id = body?.id;
+  if (typeof id !== 'string' || !ID_RE.test(id)) return reply(env, 400, { error: 'id' });
+
+  // 資料表在每次備份請求時自動建立（使用者不用自己跑 SQL）
+  await db
+    .prepare(
+      'CREATE TABLE IF NOT EXISTS backups (id TEXT NOT NULL, day TEXT NOT NULL, blob TEXT NOT NULL, size INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (id, day))',
+    )
+    .run();
+
+  if (path === '/backup/list') {
+    const { results } = await db.prepare('SELECT day, updated_at, size FROM backups WHERE id = ?1 ORDER BY day DESC').bind(id).all();
+    return reply(env, 200, { items: results.map((r) => ({ day: r.day, updatedAt: r.updated_at, size: r.size })) });
+  }
+
+  if (path === '/backup/delete') {
+    await db.prepare('DELETE FROM backups WHERE id = ?1').bind(id).run();
+    return reply(env, 200, { ok: true });
+  }
+
+  const day = body?.day;
+  if (typeof day !== 'string' || !DAY_RE.test(day)) return reply(env, 400, { error: 'day' });
+
+  if (path === '/backup/get') {
+    const row = await db.prepare('SELECT blob FROM backups WHERE id = ?1 AND day = ?2').bind(id, day).first();
+    return row ? reply(env, 200, { blob: row.blob }) : reply(env, 404, { error: 'not found' });
+  }
+
+  // /backup/put
+  const blob = body?.blob;
+  if (typeof blob !== 'string' || blob.length === 0 || !BLOB_RE.test(blob)) return reply(env, 400, { error: 'blob' });
+  if (blob.length > MAX_BLOB_CHARS) return reply(env, 413, { error: 'too large' });
+
+  const known = await db.prepare('SELECT 1 AS x FROM backups WHERE id = ?1 LIMIT 1').bind(id).first();
+  if (!known) {
+    const max = Number(env.MAX_BACKUPS) || DEFAULT_MAX_BACKUPS;
+    const row = await db.prepare('SELECT COUNT(DISTINCT id) AS n FROM backups').first();
+    if ((row?.n ?? 0) >= max) return reply(env, 403, { error: 'full' });
+  }
+  await db
+    .prepare(
+      'INSERT INTO backups (id, day, blob, size, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(id, day) DO UPDATE SET blob = excluded.blob, size = excluded.size, updated_at = excluded.updated_at',
+    )
+    .bind(id, day, blob, blob.length, now)
+    .run();
+  // 同一個代號只留日期最新的 7 天
+  await db
+    .prepare(`DELETE FROM backups WHERE id = ?1 AND day NOT IN (SELECT day FROM backups WHERE id = ?1 ORDER BY day DESC LIMIT ${KEEP_DAYS})`)
+    .bind(id)
+    .run();
+  return reply(env, 200, { ok: true });
 }
 
 // ---------- 每分鐘執行：到點的就推播 ----------
