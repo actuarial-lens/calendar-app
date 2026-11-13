@@ -17,3 +17,10 @@ export const CalendarIcon = () => (
     <path d="M3 8.5h14M7 2.5v4M13 2.5v4" />
   </svg>
 );
+
+export const SearchIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.4 15.4L21 21" />
+  </svg>
+);

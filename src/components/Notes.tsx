@@ -34,7 +34,7 @@ export function Notes({ entries, resetKey, openId, actionsFor, onOpenChange, onA
       <div className="notes-card">
         <div className="fade-in" key={resetKey}>
           {entries.map(({ item: n, phase }) => (
-            <div key={n.id} className={'collapse ' + phase}>
+            <div key={n.id} className={'collapse ' + phase} data-note-id={n.id}>
               <div className="collapse-inner">
                 <SwipeRow
                   id={n.id}

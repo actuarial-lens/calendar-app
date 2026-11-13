@@ -5,9 +5,10 @@ import { ConfirmSheet } from './components/ConfirmSheet';
 import { CalendarSheet } from './components/CalendarSheet';
 import { EditSheet } from './components/EditSheet';
 import { RepeatDeleteSheet } from './components/RepeatDeleteSheet';
-import { CalendarIcon, GearIcon, PlusIcon } from './components/Icons';
+import { CalendarIcon, GearIcon, PlusIcon, SearchIcon } from './components/Icons';
 import { MissedBlock } from './components/MissedBlock';
 import { Notes } from './components/Notes';
+import { SearchPage } from './components/SearchPage';
 import { SettingsPage } from './components/SettingsPage';
 import type { SwipeAction } from './components/SwipeRow';
 import { TagBar } from './components/TagBar';
@@ -34,6 +35,7 @@ import { newId } from './lib/id';
 import type { Reminder } from './lib/reminders';
 import { clearReloadState, setReloadSnapshot } from './lib/reloadState';
 import { dayCounts, loadLevel, visibleNotes, visibleTasks } from './lib/sort';
+import type { SearchHit } from './lib/search';
 import { isISODate } from './lib/swLogic';
 import { usePresence } from './lib/usePresence';
 import { useToday } from './lib/useToday';
@@ -60,6 +62,8 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const today = useToday();
   const [day, setDay] = useState(initialDay ?? today);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [focusTarget, setFocusTarget] = useState<{ kind: 'task' | 'note'; id: string; n: number } | null>(null); // 從搜尋結果跳過來，要捲到並標亮的那一筆
   const [missed, setMissed] = useState<Reminder[]>(initialMissed);
   const [banner, setBanner] = useState<Reminder | null>(null);
   const [tag, setTag] = useState<Tag>('全部');
@@ -84,6 +88,32 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
     setReloadSnapshot({ missed, day });
   }, [missed, day]);
 
+  // 從搜尋結果跳過來：等畫面更新後，把那一筆捲到畫面中間並標亮 1.5 秒
+  useEffect(() => {
+    if (!focusTarget) return;
+    const sel = (focusTarget.kind === 'task' ? '[data-task-id="' : '[data-note-id="') + CSS.escape(focusTarget.id) + '"]';
+    let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let el: Element | null = null;
+    let tries = 0;
+    const find = () => {
+      el = document.querySelector(sel);
+      if (!el) {
+        if (++tries < 90) raf = requestAnimationFrame(find);
+        return;
+      }
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('flash');
+      timer = setTimeout(() => el?.classList.remove('flash'), 1500);
+    };
+    raf = requestAnimationFrame(find);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      el?.classList.remove('flash');
+    };
+  }, [focusTarget]);
+
   // 補排重複事項；沒有需要補的時候不會寫入，所以不會一直循環
   useEffect(() => {
     if (tasks) void ensureRepeats(db, today);
@@ -102,6 +132,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
       if (e.data?.type === 'open-date' && isISODate(e.data.date)) {
         setDay(e.data.date);
         setSettingsOpen(false);
+        setSearchOpen(false);
         setCalOpen(false);
         setForm(null);
       }
@@ -115,6 +146,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const delP = usePresence(delAsk);
   const calP = usePresence(calOpen ? true : null);
   const settingsP = usePresence(settingsOpen ? true : null, 340);
+  const searchP = usePresence(searchOpen ? true : null, 340);
   const toastP = usePresence(toast, 240);
   const bannerP = usePresence(banner, 240);
   const missedP = usePresence(missed.length > 0 ? missed : null, 240);
@@ -232,6 +264,15 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
     void run(action);
   };
 
+  /** 點搜尋結果：關掉搜尋頁、跳到那一天；已完成的事項切到「已完成」頁籤，其他切到「全部」 */
+  const pickResult = (h: SearchHit) => {
+    setSearchOpen(false);
+    setOpenId(null);
+    setDay(h.date);
+    setTag(h.kind === 'task' && h.done ? '已完成' : '全部');
+    setFocusTarget({ kind: h.kind, id: h.id, n: Date.now() });
+  };
+
   const pickDay = (iso: string) => {
     setDay(iso);
     setOpenId(null);
@@ -252,6 +293,9 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
       <header className="header">
         <button type="button" className="gear" aria-label="設定" onClick={() => { setOpenId(null); setSettingsOpen(true); }}>
           <GearIcon />
+        </button>
+        <button type="button" className="search-btn" aria-label="搜尋" onClick={() => { setOpenId(null); setSearchOpen(true); }}>
+          <SearchIcon />
         </button>
         <button type="button" className="range" aria-label="回到今天" onClick={() => pickDay(today)}>{rangeText(day)}</button>
       </header>
@@ -333,6 +377,17 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           onExport={exportBackup}
           onImport={importBackup}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {searchP.shown && (
+        <SearchPage
+          tasks={tasks}
+          notes={notes}
+          today={today}
+          closing={searchP.closing}
+          onPick={pickResult}
+          onClose={() => setSearchOpen(false)}
         />
       )}
 
