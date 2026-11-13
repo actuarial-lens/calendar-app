@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { backupTimeText, formatCode, generateCode, isCloudReady, restoreItemText, revertConfirmText, type CloudBackupState } from '../lib/cloudBackup';
+import { ONE_PHONE_NOTE, backupTimeText, formatCode, generateCode, isCloudReady, restoreItemText, revertConfirmText, type CloudBackupState } from '../lib/cloudBackup';
 import type { Changes } from '../lib/changes';
 import type { RemoteItem } from '../lib/cloudApi';
 import type { CloudActions, RestoreMode } from '../notify/cloudActions';
@@ -95,6 +95,7 @@ export function CloudBackupSection({ settings, today, state, actions, liveCount 
           </>
         )}
         {message && <p className="row note" id="cloud-message" role="status">{message}</p>}
+        {state && <p className="row note" id="cloud-one-phone">{ONE_PHONE_NOTE}</p>}
         <p className="row note">內容在手機上用還原碼加密後才送出，伺服器只存加密後的資料，看不到內容。最近 7 天每天保留一份。</p>
       </div>
 

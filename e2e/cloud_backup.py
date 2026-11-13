@@ -1,4 +1,4 @@
-"""雲端備份（0.31.0）：開啟（先顯示還原碼、按「我已存好」才開啟）、30 秒後自動上傳、重新開啟 App 時補傳、
+"""雲端備份（0.31.0；0.33.0 加換機提醒與「只在一支手機上開啟」小字）：開啟（先顯示還原碼、按「我已存好」才開啟）、30 秒後自動上傳、重新開啟 App 時補傳、
 切到背景立即上傳、換新手機用還原碼還原（含刪除過的、設定）、已有資料時先確認、錯誤訊息、關閉並刪除雲端。
 伺服器用 Playwright 的 route 在記憶體裡模擬（內容是真的加密過的）。
 先 npm run build 並 npx vite preview --port 4173，再 python3 e2e/cloud_backup.py"""
@@ -82,6 +82,7 @@ with sync_playwright() as p:
     check('警告文字', A.get_by_text('請把還原碼存到密碼管理器或 iCloud 備忘錄。忘記還原碼，雲端備份就無法取回。').count() == 1)
     check('按「我已存好」之前還沒開啟、伺服器沒收到東西', len(puts) == 0 and len(store) == 0)
     A.get_by_role('button', name='取消').click(); A.wait_for_timeout(500)
+    check('未開啟：沒有「只在一支手機上開啟」小字', A.locator('#cloud-one-phone').count() == 0)
     check('取消：沒開啟', A.locator('#cloud-enable').count() == 1 and A.locator('#cloud-status').count() == 0 and len(puts) == 0)
     A.click('#cloud-enable'); A.wait_for_selector('#recovery-code'); A.wait_for_timeout(450)
     code = A.get_attribute('#recovery-code', 'data-code')
@@ -91,6 +92,7 @@ with sync_playwright() as p:
     check('狀態：上次備份：今天 HH:MM', st.startswith('上次備份：今天 ') and len(st) == len('上次備份：今天 22:40'), st)
     blobs = json.dumps(store)
     check('伺服器上看不到還原碼與事項內容', code not in blobs and 'title' not in blobs and (len(store) == 1))
+    check('已開啟：有「同一組還原碼只在一支手機上開啟。」小字', A.locator('#cloud-one-phone').count() == 1 and A.inner_text('#cloud-one-phone') == '同一組還原碼只在一支手機上開啟。')
     check('四個按鈕都在', all(A.locator(s).count() == 1 for s in ['#cloud-now', '#cloud-show', '#cloud-restore', '#cloud-rotate', '#cloud-disable']))
     A.click('#cloud-show'); A.wait_for_selector('#recovery-code'); A.wait_for_timeout(450)
     check('顯示還原碼：同一組', A.get_attribute('#recovery-code', 'data-code') == code)
@@ -151,6 +153,8 @@ with sync_playwright() as p:
     check('空手機直接還原（不用確認），顯示結果', msg.startswith('已還原：新增事項 ') and '這支手機已用這組還原碼開啟雲端備份' in msg, msg)
     rows = B.evaluate(ALL)
     titles = {r['title']: r['deleted'] for r in rows}
+    check('空手機還原：結果最後有「關閉舊手機」的提醒（0.33.0）', msg.endswith('如果舊手機還在，請到舊手機的設定 → 雲端備份 →「關閉雲端備份」→ 選「只關閉」，以免它用舊資料蓋掉雲端上的備份。'), msg)
+    check('新手機已開啟：設定頁有「同一組還原碼只在一支手機上開啟。」', B.locator('#cloud-one-phone').count() == 1 and B.inner_text('#cloud-one-phone') == '同一組還原碼只在一支手機上開啟。')
     check('事項回來了，含雲端測試乙', titles.get('雲端測試乙') is False, str(len(rows)))
     check('刪除過的事項帶回來但仍是已刪除（沒有復活）', titles.get('雲端測試甲') is True)
     B.get_by_text('每日提醒時間').scroll_into_view_if_needed()

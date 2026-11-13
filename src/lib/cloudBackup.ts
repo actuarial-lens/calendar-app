@@ -287,6 +287,11 @@ export const revertSummary = (day: string, p: RevertPlan): string =>
 export const revertConfirmText = (day: string): string =>
   `要把資料回到 ${dayLabel(day)}的狀態嗎？備份裡有的事項與隨手記會換回那天的內容；那天之後新增的會保留。`;
 
+/** 換機（這支手機因為這次還原才開啟雲端備份）之後，提醒關掉舊手機的雲端備份 */
+export const OLD_PHONE_REMINDER = '如果舊手機還在，請到舊手機的設定 → 雲端備份 →「關閉雲端備份」→ 選「只關閉」，以免它用舊資料蓋掉雲端上的備份。';
+/** 設定頁（已開啟時）的小字 */
+export const ONE_PHONE_NOTE = '同一組還原碼只在一支手機上開啟。';
+
 export const UNDO_RESTORE_TEXT = '已復原到還原之前的狀態。';
 
 // ---------- 小工具 ----------

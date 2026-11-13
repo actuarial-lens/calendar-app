@@ -5,7 +5,7 @@ import { loadSettings, saveSettings } from '../db/settings';
 import * as cloudApi from '../lib/cloudApi';
 import type { CloudConfig, RemoteItem } from '../lib/cloudApi';
 import {
-  CLOUD_KEY, CloudError, UNDO_RESTORE_TEXT, decryptBackup, deriveKeys, normalizeCode, planCloudRestore, planCloudRevert, restoreSummary, revertSummary, settingsPatchFrom,
+  CLOUD_KEY, CloudError, OLD_PHONE_REMINDER, UNDO_RESTORE_TEXT, decryptBackup, deriveKeys, normalizeCode, planCloudRestore, planCloudRevert, restoreSummary, revertSummary, settingsPatchFrom,
   type CloudBackupState,
 } from '../lib/cloudBackup';
 import { CloudUploader, type UploaderDeps } from './cloudSync';
@@ -118,7 +118,7 @@ export function createCloudActions(db: AppDB, uploader: CloudUploader, server: C
         const inverse = await commit(db, plan.changes);
         if (Object.keys(patch).length) await saveSettings(db, patch);
         uploader.markDirty(); // 回到那一天資料一定有變：排上傳
-        return { text: revertSummary(day, plan), inverse };
+        return { text: revertSummary(day, plan) + (had ? '' : OLD_PHONE_REMINDER), inverse };
       }
 
       const plan = planCloudRestore(backup, tasks, notes);
@@ -126,7 +126,9 @@ export function createCloudActions(db: AppDB, uploader: CloudUploader, server: C
       if (Object.keys(patch).length) await saveSettings(db, patch);
       if (!had) uploader.markDirty();
       return {
-        text: restoreSummary(plan) + (had ? '' : plan.changes.putTasks.length + plan.changes.putNotes.length === 0 ? '這支手機已用這組還原碼開啟雲端備份。' : '。這支手機已用這組還原碼開啟雲端備份。'),
+        text:
+          restoreSummary(plan) +
+          (had ? '' : (plan.changes.putTasks.length + plan.changes.putNotes.length === 0 ? '這支手機已用這組還原碼開啟雲端備份。' : '。這支手機已用這組還原碼開啟雲端備份。') + OLD_PHONE_REMINDER),
       };
     } catch (e) {
       return { text: errText(e) };

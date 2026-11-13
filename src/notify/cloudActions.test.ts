@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { AppDB } from '../db/db';
 import { loadSettings, saveSettings } from '../db/settings';
-import { CloudError, CLOUD_KEY, deriveKeys, formatCode, generateCode } from '../lib/cloudBackup';
+import { CloudError, CLOUD_KEY, OLD_PHONE_REMINDER, deriveKeys, formatCode, generateCode } from '../lib/cloudBackup';
 import type { RemoteItem } from '../lib/cloudApi';
 import type { Note, Task } from '../types';
 import { CloudUploader } from './cloudSync';
@@ -126,7 +126,7 @@ describe('從雲端還原（換手機）', () => {
     expect(code).toBe(CODE);
     expect(items.map((i) => i.day)).toEqual(['2026-11-13']);
     const msg = await p.actions.restore(code, items[0].day);
-    expect(msg).toBe('已還原：新增事項 2、更新 0；新增隨手記 1、更新 0。這支手機已用這組還原碼開啟雲端備份。');
+    expect(msg).toBe('已還原：新增事項 2、更新 0；新增隨手記 1、更新 0。這支手機已用這組還原碼開啟雲端備份。' + OLD_PHONE_REMINDER);
     const all = await p.db.tasks.toArray();
     expect(all.map((t) => t.id).sort()).toEqual(['t1', 't2', 't3']);
     expect(all.find((t) => t.id === 't2')!.deletedAt).toBe(7); // 刪除的沒有復活
@@ -260,7 +260,7 @@ describe('還原：回到那一天（同一支手機）', () => {
     const { s } = await scenario();
     const q = await phone(s.server);
     const r = await q.actions.restoreWithUndo(CODE, '2026-11-12', 'revert');
-    expect(r.text).toBe('已回到 11/12（四）：換回事項 2、隨手記 1；保留之後新增的事項 0、隨手記 0。');
+    expect(r.text).toBe('已回到 11/12（四）：換回事項 2、隨手記 1；保留之後新增的事項 0、隨手記 0。' + OLD_PHONE_REMINDER);
     expect((await loadCloudState(q.db))!.code).toBe(CODE);
     expect(await q.db.tasks.count()).toBe(2);
     await q.actions.undoRestore(r.inverse!);
@@ -274,6 +274,52 @@ describe('還原：回到那一天（同一支手機）', () => {
     expect((await p.actions.restoreWithUndo(CODE, '2020-01-01', 'revert')).text).toBe('找不到這組還原碼的備份');
     expect((await p.actions.restoreWithUndo('bad', '2026-11-12', 'revert')).text).toBe('還原碼格式不對');
     expect(await titles(p.db)).toEqual(before);
+  });
+});
+
+describe('換機後提醒關閉舊手機的雲端備份', () => {
+  const SENTENCE = '如果舊手機還在，請到舊手機的設定 → 雲端備份 →「關閉雲端備份」→ 選「只關閉」，以免它用舊資料蓋掉雲端上的備份。';
+  async function backedUp() {
+    const s = fakeServer();
+    const old = await phone(s.server);
+    await old.db.tasks.put(task('t1', { updatedAt: 5 }));
+    await old.actions.enable(CODE);
+    return s;
+  }
+  it('提醒的文字', () => {
+    expect(OLD_PHONE_REMINDER).toBe(SENTENCE);
+  });
+  it('這支手機因為這次還原才開啟（合併）：結果最後有這句提醒', async () => {
+    const s = await backedUp();
+    const p = await phone(s.server);
+    const msg = await p.actions.restore(CODE, '2026-11-13');
+    expect(msg.endsWith(SENTENCE)).toBe(true);
+    expect(msg).toContain('這支手機已用這組還原碼開啟雲端備份。');
+  });
+  it('回到那一天、全新手機：同樣有提醒', async () => {
+    const s = await backedUp();
+    const p = await phone(s.server);
+    expect((await p.actions.restore(CODE, '2026-11-13', 'revert')).endsWith(SENTENCE)).toBe(true);
+  });
+  it('沒有東西要還原時（手機上已有一樣的資料、但還沒開啟雲端備份）也有提醒', async () => {
+    const s = await backedUp();
+    const p = await phone(s.server);
+    await p.db.tasks.put(task('t1', { updatedAt: 5 }));
+    const msg = await p.actions.restore(CODE, '2026-11-13');
+    expect(msg.startsWith('雲端的資料這支手機都已經有了，沒有需要還原的。')).toBe(true);
+    expect(msg.endsWith(SENTENCE)).toBe(true);
+  });
+  it('已開啟雲端備份的手機還原（兩種模式）：沒有這句提醒', async () => {
+    const s = await backedUp();
+    const p = await phone(s.server);
+    await p.actions.enable(CODE);
+    expect(await p.actions.restore(CODE, '2026-11-13')).not.toContain('舊手機');
+    expect((await p.actions.restore(CODE, '2026-11-13', 'revert')).includes('舊手機')).toBe(false);
+  });
+  it('還原失敗時沒有提醒', async () => {
+    const s = await backedUp();
+    const p = await phone(s.server);
+    expect(await p.actions.restore(CODE, '2020-01-01')).not.toContain('舊手機');
   });
 });
 
