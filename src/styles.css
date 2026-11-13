@@ -5,6 +5,7 @@
   --text-2: #59635D;
   --blue: #2F5D50;
   --blue-rgb: 47, 93, 80;
+  --sky: #4F8FCB; /* 「截止日」標示的淺藍 */
   --on-blue-2: #BDD6CA; /* 深色橫幅上的次要文字 */
   --lv1: #DDE6DF;
   --lv2: #B5CBBE;
@@ -136,15 +137,23 @@ input::placeholder { color: #7C837E; }
 .card .left { display: flex; gap: 8px; align-items: center; }
 .card .cat { font-size: 12px; color: var(--blue); font-weight: 500; letter-spacing: 0.12em; }
 .card.important { background: var(--imp-bg); }
-/* 膠囊：框中心＝膠囊字中心＝左邊分類文字中心（pill_align.py 量過，2x/3x/4x 螢幕差 ≤0.16px）；top 1.25px 是量出來的值 */
-.card .pill {
-  position: relative; top: 1.25px;
-  box-sizing: border-box; height: 21px; padding: 0 7px; border-radius: 999px; border: 1px solid;
-  display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; letter-spacing: 0; line-height: 1;
-}
-.card .imp { color: #B3261E; border-color: #E2A9A3; }
-.card .dl { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
-.card .delay { color: var(--delay-fg); border-color: var(--delay-bd); }
+/* 分類後面的標示：不用框，用「·」分開；全部和分類文字同字級、同粗細、同字距、同行高，中心自然一致。
+   「·」前後的空白要一樣寬：字距會在每個詞後面多留 0.12em，「·」左邊的 margin 少 0.12em，再依前一個字的字形補回（tag_align.py 用墨跡量過，前後空白差 ≤0.3px） */
+.card .left { gap: 0; white-space: nowrap; flex-wrap: wrap; row-gap: 2px; min-width: 0; }
+.card .left > * { flex: none; }
+.card .row1 .time { flex: none; margin-left: 10px; }
+.card .pair { display: inline-flex; align-items: baseline; } /* 「·」和後面的字一起換行，不會有一行開頭是「·」 */
+.card .left > .cat, .card .pair > .mark, .card .pair > .sep { font-size: 12px; font-weight: 500; letter-spacing: 0.12em; line-height: 1.4; }
+.card .sep { color: var(--text-2); font-weight: 400; letter-spacing: 0; margin: 0 0.5em 0 calc(0.5em - 0.12em + 0.2em); }
+/* 「·」左邊的空白依前一個字的字形微調（「要／日／天」的右邊留白比「辦／議／人」小），讓前後空白看起來一樣寬 */
+.card .cat + .pair > .sep { margin-left: calc(0.5em - 0.12em + 0.08em + 0.3px); }
+.card .pair:has(.imp) + .pair > .sep, .card .pair:has(.delay) + .pair > .sep { margin-left: 5.5px; }
+.card .pair:has(.dl) + .pair > .sep { margin-left: 4.25px; }
+.card .pair:has(.rep) > .sep { margin-right: calc(0.5em - 0.8px); } /* 「↻」左邊的留白比文字大 */
+.card .imp { color: #B3261E; }
+.card .dl { color: var(--sky); }
+.card .delay { color: var(--text-2); }
+.card .rep { color: var(--text-2); }
 .card .time { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 .card .title { font-size: 16px; font-weight: 500; }
 .card.done .title { color: var(--done-title); text-decoration: line-through; }
@@ -544,9 +553,6 @@ input { caret-color: var(--blue); accent-color: var(--blue); }
 .date-chip::-webkit-datetime-edit { padding: 0; }
 
 /* 重複事項 */
-.card .rep { display: inline-flex; align-items: center; gap: 3px; position: relative; top: 1.25px; font-size: 11px; color: var(--text-2); letter-spacing: 0.04em; line-height: 1; }
-.card .rep-i { flex: none; position: relative; top: 0.5px; }
-.card .rep-t { position: relative; top: -0.25px; } /* 符號與文字的中心都對準分類文字（pill_align.py 量過） */
 .field-hint { margin: 2px 2px 0; font-size: 12px; line-height: 1.6; color: var(--text-2); }
 .del-text { margin: 0; font-size: 15px; line-height: 1.7; }
 .del-actions { display: flex; flex-direction: column; gap: 10px; }

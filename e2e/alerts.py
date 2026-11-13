@@ -116,7 +116,7 @@ async def main():
         check('一般事項直接切換', await dlchip.get_attribute('aria-pressed') == 'true' and await page.locator('#scope-title').count() == 0)
         await page.locator('.btn-primary').click(); await page.wait_for_timeout(700)
         tag = page.locator('.card', has_text='交報告').locator('.dl')
-        check('卡片「截止」藍字', await tag.inner_text() == '截止' and await tag.evaluate("e=>getComputedStyle(e).color") == 'rgb(47, 93, 80)')
+        check('卡片「截止日」淺藍字', await tag.inner_text() == '截止日' and await tag.evaluate("e=>getComputedStyle(e).color") == 'rgb(79, 143, 203)')
         check('提示框列入', '交報告' in await page.locator('.alerts').inner_text() or '未來 7 天內有 1 個截止日' in await page.locator('.alerts-sum').inner_text())
 
         # 重複事項：問範圍

@@ -40,19 +40,18 @@ export function TaskCard({ task, phase, open, anyOpen, actions, startActions, op
             <div className="left">
               <span className="cat">{task.category}</span>
               {/* 膠囊的順序：重要（紅）→ 截止（藍）→ 延 N 天；重複標記是純文字，放最後 */}
-              {task.important && <span className="pill imp">重要</span>}
-              {task.deadline && <span className="pill dl">截止</span>}
-              {!task.done && task.delayDays > 0 && <span className="pill delay">延 {task.delayDays} 天</span>}
-              {task.repeat && (
-                <span className="rep">
-                  {/* 符號用 SVG：各手機的「↻」字形不同，位置會跑掉；SVG 的中心是固定的 */}
-                  <svg className="rep-i" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M10 6a4 4 0 1 1-1.17-2.83" />
-                    <path d="M10 1.5v2.2H7.8" />
-                  </svg>
-                  <span className="rep-t">{REPEAT_LABEL[task.repeat.freq]}</span>
+              {/* 分類後面依序接：重要（紅）→ 截止日（淺藍）→ 延 N 天 → 重複；每項前面一個「·」 */}
+              {[
+                task.important && <span key="imp" className="mark imp">重要</span>,
+                task.deadline && <span key="dl" className="mark dl">截止日</span>,
+                !task.done && task.delayDays > 0 && <span key="delay" className="mark delay">延 {task.delayDays} 天</span>,
+                task.repeat && <span key="rep" className="mark rep">↻ {REPEAT_LABEL[task.repeat.freq]}</span>,
+              ].filter(Boolean).map((el, i) => (
+                <span key={i} className="pair">
+                  <span className="sep">·</span>
+                  {el}
                 </span>
-              )}
+              ))}
             </div>
             <span className="time">{task.time}</span>
           </div>
