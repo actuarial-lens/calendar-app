@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { WEEKDAYS_MON, monthCells, parseISO } from '../lib/dates';
 import { Sheet } from './Sheet';
+import type { LoadLevel } from '../lib/sort';
 
 interface Props {
   day: string;
   closing: boolean;
   today: string;
-  marks?: (iso: string) => boolean;
+  level?: (iso: string) => LoadLevel; // 這天有多滿（顏色深淺）
   minDate?: string; // 早於這天的日子不能選
   todayLabel?: string;
   onPick: (iso: string) => void;
@@ -20,7 +21,7 @@ const Chevron = ({ d }: { d: string }) => (
   </svg>
 );
 
-export function CalendarSheet({ day, closing, today, marks, minDate, todayLabel = '回到今天', onPick, onToday, onClose }: Props) {
+export function CalendarSheet({ day, closing, today, level, minDate, todayLabel = '回到今天', onPick, onToday, onClose }: Props) {
   const [ym, setYm] = useState(() => {
     const d = parseISO(day);
     return { y: d.getFullYear(), m: d.getMonth() };
@@ -62,14 +63,13 @@ export function CalendarSheet({ day, closing, today, marks, minDate, todayLabel 
               <button
                 key={iso}
                 type="button"
-                className={'cal-day' + (iso === today ? ' today' : '') + (marks?.(iso) ? ' has' : '')}
+                className={'cal-day' + (iso === today ? ' today' : '') + (level ? ' lv' + level(iso) : '')}
                 aria-pressed={iso === day}
                 disabled={!!minDate && iso < minDate}
                 aria-label={`${ym.m + 1}月${Number(iso.slice(8))}日${iso === today ? '（今天）' : ''}`}
                 onClick={() => onPick(iso)}
               >
                 <span className="n">{Number(iso.slice(8))}</span>
-                <span className="dot" />
               </button>
             ),
           )}

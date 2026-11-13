@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Note, Task } from '../types';
-import { hasContent, sortKey, sortTasks, visibleNotes, visibleTasks } from './sort';
+import { dayCounts, loadLevel, sortKey, sortTasks, visibleNotes, visibleTasks } from './sort';
 
 const task = (p: Partial<Task> & { id: string }): Task => ({
   date: '2026-11-10',
@@ -89,7 +89,7 @@ describe('visibleTasks', () => {
   });
 });
 
-describe('visibleNotes / hasContent', () => {
+describe('visibleNotes / 週列深淺', () => {
   const notes = [
     note({ id: 'n2', createdAt: 20 }),
     note({ id: 'n1', createdAt: 10 }),
@@ -99,11 +99,19 @@ describe('visibleNotes / hasContent', () => {
   it('隨手記每天獨立，新的在下面', () => {
     expect(visibleNotes(notes, '2026-11-10').map((n) => n.id)).toEqual(['n1', 'n2']);
   });
-  it('小點：有未完成事項或隨手記才有', () => {
-    expect(hasContent('2026-11-10', [], notes)).toBe(true);
-    expect(hasContent('2026-11-12', [task({ id: 'a', date: '2026-11-12' })], [])).toBe(true);
-    expect(hasContent('2026-11-12', [task({ id: 'a', date: '2026-11-12', done: true })], [])).toBe(false);
-    expect(hasContent('2026-11-12', [task({ id: 'a', date: '2026-11-12', deletedAt: 1 })], [])).toBe(false);
-    expect(hasContent('2026-11-13', [], [note({ id: 'x', date: '2026-11-13', deletedAt: 1 })])).toBe(false);
+  it('深淺：只算未完成、未刪除的事項，隨手記不算', () => {
+    const c = dayCounts([
+      task({ id: 'a', date: '2026-11-12' }),
+      task({ id: 'b', date: '2026-11-12' }),
+      task({ id: 'c', date: '2026-11-12', done: true }),
+      task({ id: 'd', date: '2026-11-12', deletedAt: 1 }),
+      task({ id: 'e', date: '2026-11-13' }),
+    ]);
+    expect(c.get('2026-11-12')).toBe(2);
+    expect(c.get('2026-11-13')).toBe(1);
+    expect(c.get('2026-11-10')).toBeUndefined(); // 只有隨手記的日子 → 空
+  });
+  it('分級：0 空、1–2、3–4、5 以上', () => {
+    expect([0, 1, 2, 3, 4, 5, 12].map(loadLevel)).toEqual([0, 1, 1, 2, 2, 3, 3]);
   });
 });

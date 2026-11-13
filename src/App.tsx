@@ -28,11 +28,11 @@ import { useTaskDrag } from './lib/useTaskDrag';
 import type { Action, Changes } from './lib/changes';
 import { useAnimatedList } from './lib/animatedList';
 import { alertsEmpty, buildAlerts, moveAllToToday, muteOverdue } from './lib/alerts';
-import { addDays, rangeText, weekDates } from './lib/dates';
+import { addDays, rangeText } from './lib/dates';
 import { formFromTask, newForm, type EditorForm } from './lib/editor';
 import { newId } from './lib/id';
 import type { Reminder } from './lib/reminders';
-import { hasContent, visibleNotes, visibleTasks } from './lib/sort';
+import { dayCounts, loadLevel, visibleNotes, visibleTasks } from './lib/sort';
 import { isISODate } from './lib/swLogic';
 import { usePresence } from './lib/usePresence';
 import { useToday } from './lib/useToday';
@@ -132,11 +132,9 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const alertsP = usePresence(showAlerts ? alerts : null, 240);
   const moveP = usePresence(moveAsk, 300);
 
-  const marks = useMemo(() => {
-    const s = new Set<string>();
-    if (tasks && notes) for (const iso of weekDates(day)) if (hasContent(iso, tasks, notes)) s.add(iso);
-    return s;
-  }, [tasks, notes, day]);
+  // 週列與月曆的顏色深淺：每天未完成事項的件數
+  const counts = useMemo(() => dayCounts(tasks ?? []), [tasks]);
+  const level = useCallback((iso: string) => loadLevel(counts.get(iso) ?? 0), [counts]);
 
   if (!tasks || !notes || !settings) return <div className="app" />;
 
@@ -263,7 +261,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           onComplete={(t) => void run(A.completeTask(t, Date.now()))}
         />
       )}
-      <WeekStrip day={day} marks={marks} onPick={pickDay} onShiftWeek={(dir) => pickDay(addDays(day, dir * 7))} />
+      <WeekStrip day={day} level={level} onPick={pickDay} onShiftWeek={(dir) => pickDay(addDays(day, dir * 7))} />
       <TagBar tag={tag} onPick={(t) => { setTag(t); setOpenId(null); }} />
 
       <main className="main">
@@ -388,7 +386,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           day={day}
           closing={calP.closing}
           today={today}
-          marks={(iso) => hasContent(iso, tasks, notes)}
+          level={level}
           onPick={(iso) => { pickDay(iso); setCalOpen(false); }}
           onToday={() => { pickDay(today); setCalOpen(false); }}
           onClose={() => setCalOpen(false)}

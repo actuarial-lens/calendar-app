@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import { WEEKDAYS_MON, weekDates } from '../lib/dates';
+import type { LoadLevel } from '../lib/sort';
 
 interface Props {
   day: string;
-  marks: Set<string>; // 有小點的日子
+  level: (iso: string) => LoadLevel; // 這天有多滿（顏色深淺）
   onPick: (iso: string) => void;
   onShiftWeek: (dir: 1 | -1) => void; // 左右滑動換週：1 = 下一週，-1 = 上一週
 }
@@ -11,7 +12,7 @@ interface Props {
 /** 滑動超過這個距離（px）放開，就換到另一週 */
 const SWIPE_DISTANCE = 50;
 
-export function WeekStrip({ day, marks, onPick, onShiftWeek }: Props) {
+export function WeekStrip({ day, level, onPick, onShiftWeek }: Props) {
   const dates = weekDates(day);
   const start = dates[0];
 
@@ -90,13 +91,12 @@ export function WeekStrip({ day, marks, onPick, onShiftWeek }: Props) {
         <button
           key={iso}
           type="button"
-          className={'day' + (marks.has(iso) ? ' has' : '')}
+          className={'day lv' + level(iso)}
           aria-pressed={iso === day}
           onClick={() => onPick(iso)}
         >
           <span className="wk">{WEEKDAYS_MON[i]}</span>
           <span className="n">{Number(iso.slice(8))}</span>
-          <span className="dot" />
         </button>
       ))}
     </div>

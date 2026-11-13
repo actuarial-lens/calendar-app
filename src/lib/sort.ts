@@ -40,10 +40,19 @@ export function visibleNotes(notes: Note[], day: string): Note[] {
     .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 }
 
-/** 週列／月曆的小點：有未完成事項或隨手記 */
-export function hasContent(iso: string, tasks: Task[], notes: Note[]): boolean {
-  return (
-    tasks.some((t) => !t.deletedAt && !t.done && t.date === iso) ||
-    notes.some((n) => !n.deletedAt && n.date === iso)
-  );
+/** 週列／月曆的顏色深淺：0 = 空（沒有未完成事項；只有隨手記也算空）、1 = 1–2 件、2 = 3–4 件、3 = 5 件以上 */
+export type LoadLevel = 0 | 1 | 2 | 3;
+
+export function loadLevel(count: number): LoadLevel {
+  if (count <= 0) return 0;
+  if (count <= 2) return 1;
+  if (count <= 4) return 2;
+  return 3;
+}
+
+/** 每一天未完成（未刪除）的事項件數；隨手記不算 */
+export function dayCounts(tasks: Task[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const t of tasks) if (!t.deletedAt && !t.done) m.set(t.date, (m.get(t.date) ?? 0) + 1);
+  return m;
 }
