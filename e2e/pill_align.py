@@ -45,17 +45,18 @@ async def main():
                 ins = 3  # 避開框線
                 pc = ink_center(a, int((bx['y'] + ins - cy) * SCALE), int((bx['y'] + bx['height'] - ins - cy) * SCALE),
                                 int((bx['x'] + min(bx['height'] / 2, bx['width'] * .3) - cx) * SCALE), int((bx['x'] + bx['width'] - min(bx['height'] / 2, bx['width'] * .3) - cx) * SCALE))
-                res.append((title, name, round((pc - cc) / SCALE, 2), round(bx['y'] + bx['height'] / 2 - (cat['y'] + cat['height'] / 2), 2)))
+                res.append((title, name, round((pc - cc) / SCALE, 2), round((bx['y'] + bx['height'] / 2 - cy) - cc / SCALE, 2), round(pc / SCALE - (bx['y'] + bx['height'] / 2 - cy), 2)))
         # 重要且未完成的卡片底色（A：#FBF0EE）；沒標重要的維持 --card
         bgs = await page.evaluate("()=>[...document.querySelectorAll('.card')].map(c=>[c.querySelector('.title').textContent, getComputedStyle(c).backgroundColor])")
         print('卡片底色:', bgs)
         want = {'全部都有': 'rgb(251, 240, 238)', '只有重要': 'rgb(251, 240, 238)', '只有截止': 'rgb(250, 250, 246)', '只有延後': 'rgb(250, 250, 246)'}
         for ti, col in bgs:
-            if ti in want and col != want[ti]: print('FAIL 底色', ti, col); res.append((ti, '底色', 99, 0))
+            if ti in want and col != want[ti]: print('FAIL 底色', ti, col); res.append((ti, '底色', 99, 0, 0))
         bad = 0
-        for title, name, d, boxd in res:
-            ok = abs(d) <= 0.5; bad += not ok
-            print('OK  ' if ok else 'FAIL', f'{title}／{name}：字比分類文字{"低" if d > 0 else "高"} {abs(d):.2f}px（框中心差 {boxd:+.2f}px）')
+        for title, name, d, boxd, inkd in res:
+            # 三個中心要一致：膠囊字 vs 分類字、膠囊框 vs 分類字、膠囊字 vs 膠囊框（都 ≤0.3px，低於一個裝置像素）
+            ok = abs(d) <= 0.3 and abs(boxd) <= 0.3 and abs(inkd) <= 0.3; bad += not ok
+            print('OK  ' if ok else 'FAIL', f'{title}／{name}：膠囊字−分類字 {d:+.2f}px，膠囊框−分類字 {boxd:+.2f}px，膠囊字−膠囊框 {inkd:+.2f}px')
         print('FAILS:', bad)
         await b.close()
 asyncio.run(main())
