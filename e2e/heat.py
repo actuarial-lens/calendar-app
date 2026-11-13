@@ -32,7 +32,7 @@ async def main():
         bgs = await page.evaluate("""()=>[...document.querySelectorAll('.week .day')].slice(0,4).map(b=>getComputedStyle(b).backgroundColor)""")
         check('由淺到深', bgs[0] == 'rgba(0, 0, 0, 0)' and len(set(bgs)) == 4, str(bgs))
         await page.locator('.week .day').nth(3).click(); await page.wait_for_timeout(400)
-        check('選中的那天維持深藍', await page.locator('.week .day').nth(3).evaluate("e=>getComputedStyle(e).backgroundColor") == 'rgb(46, 74, 107)')
+        check('選中的那天維持深綠', await page.locator('.week .day').nth(3).evaluate("e=>getComputedStyle(e).backgroundColor") == 'rgb(47, 93, 80)')
 
         # 完成一件 → 週三從 3 件變 2 件（lv2 → lv1）
         await page.locator('.week .day').nth(2).click(); await page.wait_for_timeout(500)

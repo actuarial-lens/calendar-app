@@ -1,14 +1,19 @@
 :root {
-  --bg: #F2F0EB;
-  --card: #FBFAF7;
-  --text: #22262B;
-  --text-2: #5F646B;
-  --blue: #2E4A6B;
-  --border: #C7C3BA;
-  --line: #DEDAD2;
+  --bg: #EFF0EA;
+  --card: #FAFAF6;
+  --text: #1F2924;
+  --text-2: #59635D;
+  --blue: #2F5D50;
+  --blue-rgb: 47, 93, 80;
+  --on-blue-2: #BDD6CA; /* 深色橫幅上的次要文字 */
+  --lv1: #DDE6DF;
+  --lv2: #B5CBBE;
+  --lv3: #82A592;
+  --border: #C4C8BC;
+  --line: #DCDED5;
   --delay-fg: #8A4B3F;
   --delay-bd: #D9B8B0;
-  --done-title: #6B7077;
+  --done-title: #6B726D;
   --imp-bg: #FBF0EE; /* 標了「重要」且未完成的卡片底色 */
   --amber: #9A5800; /* 深琥珀：重要未結／截止提示 */
   --amber-bd: #E2C394;
@@ -29,7 +34,7 @@ body {
 }
 button { font-family: inherit; cursor: pointer; }
 input { font-family: inherit; }
-input::placeholder { color: #7A7F86; }
+input::placeholder { color: #7C837E; }
 
 .app {
   position: relative;
@@ -86,9 +91,9 @@ input::placeholder { color: #7A7F86; }
 .day .wk { font-size: 12px; color: var(--text-2); }
 .day .n { font-family: var(--mono); font-size: 18px; }
 /* 這天有多滿：未完成事項 1–2／3–4／5 件以上，底色由淺到深（選中的那天維持深藍） */
-.day.lv1, .cal-day.lv1 { background: rgba(46, 74, 107, 0.10); }
-.day.lv2, .cal-day.lv2 { background: rgba(46, 74, 107, 0.22); }
-.day.lv3, .cal-day.lv3 { background: rgba(46, 74, 107, 0.38); }
+.day.lv1, .cal-day.lv1 { background: var(--lv1); }
+.day.lv2, .cal-day.lv2 { background: var(--lv2); }
+.day.lv3, .cal-day.lv3 { background: var(--lv3); }
 .day.lv3 .wk { color: var(--text); }
 .day[aria-pressed='true'] { background: var(--blue); color: var(--bg); }
 .day[aria-pressed='true'] .wk { color: var(--bg); }
@@ -225,7 +230,7 @@ input::placeholder { color: #7A7F86; }
 }
 .toast button {
   height: 40px; padding: 0 12px; border: none; background: none;
-  color: #B9CCE3; font-size: 14px; font-weight: 500;
+  color: var(--on-blue-2); font-size: 14px; font-weight: 500;
 }
 
 /* 底部面板（新增／編輯、月曆共用） */
@@ -372,7 +377,7 @@ input::placeholder { color: #7A7F86; }
 }
 .banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .banner-text strong { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.banner-text span { font-family: var(--mono); font-size: 12px; color: #B9CCE3; }
+.banner-text span { font-family: var(--mono); font-size: 12px; color: var(--on-blue-2); }
 .banner button { width: 40px; height: 40px; border: none; background: none; color: var(--bg); font-size: 16px; }
 
 /* 設定頁 */
@@ -425,7 +430,7 @@ input::placeholder { color: #7A7F86; }
 .lead-warn { margin: 0; font-size: 13px; color: #B3261E; }
 .lead-notice {
   padding: 10px 12px; border-radius: 12px; border: 1px solid var(--blue);
-  background: rgba(46, 74, 107, 0.06); font-size: 13px; line-height: 1.6; color: var(--text);
+  background: rgba(var(--blue-rgb), 0.06); font-size: 13px; line-height: 1.6; color: var(--text);
   animation: lead-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 @keyframes lead-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
@@ -436,7 +441,7 @@ input::placeholder { color: #7A7F86; }
   background: var(--bg); font-family: var(--mono); font-size: 16px; color: var(--text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.text-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(46, 74, 107, 0.14); outline: none; }
+.text-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.14); outline: none; }
 .help { margin: 0; padding: 12px 18px 12px 34px; font-size: 13px; line-height: 1.7; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; }
 .version { margin: 0; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 
@@ -515,7 +520,7 @@ button.range:active { opacity: 0.55; }
 /* 輸入框聚焦：外框與游標用主色 */
 input { caret-color: var(--blue); accent-color: var(--blue); }
 .text-input, .time-field { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-.text-input:focus, .time-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(46, 74, 107, 0.14); }
+.text-input:focus, .time-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.14); }
 
 /* 空白狀態淡入 */
 .empty { animation: fadeIn 0.4s ease 0.2s backwards; }
@@ -561,7 +566,7 @@ input { caret-color: var(--blue); accent-color: var(--blue); }
 }
 .wheel-band {
   position: absolute; left: 12px; right: 12px; top: calc(var(--wheel-row) * 2); height: var(--wheel-row);
-  border-radius: 10px; background: rgba(46, 74, 107, 0.12); pointer-events: none;
+  border-radius: 10px; background: rgba(var(--blue-rgb), 0.12); pointer-events: none;
 }
 .wheel-col {
   position: relative; min-width: 0; height: 100%;

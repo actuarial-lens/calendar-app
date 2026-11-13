@@ -40,8 +40,8 @@ import { enableNotifications, sendTestNotification } from './notify/enable';
 import { useReminders } from './notify/useReminders';
 import type { Note, Tag, Task } from './types';
 
-const BLUE = '#2E4A6B';
-const GREY = '#6F6A60';
+const BLUE = '#2F5D50';
+const GREY = '#6F726B';
 const RED = '#A4554B';
 const TOAST_MS = 4000;
 const ALERTS_ACK = 'alertsAck';

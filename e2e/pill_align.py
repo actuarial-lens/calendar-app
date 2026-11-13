@@ -49,7 +49,7 @@ async def main():
         # 重要且未完成的卡片底色（A：#FBF0EE）；沒標重要的維持 --card
         bgs = await page.evaluate("()=>[...document.querySelectorAll('.card')].map(c=>[c.querySelector('.title').textContent, getComputedStyle(c).backgroundColor])")
         print('卡片底色:', bgs)
-        want = {'全部都有': 'rgb(251, 240, 238)', '只有重要': 'rgb(251, 240, 238)', '只有截止': 'rgb(251, 250, 247)', '只有延後': 'rgb(251, 250, 247)'}
+        want = {'全部都有': 'rgb(251, 240, 238)', '只有重要': 'rgb(251, 240, 238)', '只有截止': 'rgb(250, 250, 246)', '只有延後': 'rgb(250, 250, 246)'}
         for ti, col in bgs:
             if ti in want and col != want[ti]: print('FAIL 底色', ti, col); res.append((ti, '底色', 99, 0))
         bad = 0
