@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { undelayTask, saveForm } from './actions';
-import { alertsEmpty, alertsSummary, buildAlerts, monthDay, moveAllToToday, muteOverdue } from './alerts';
+import { alertsEmpty, alertsLines, buildAlerts, MONTH_DAY_WIDEST, monthDay, moveAllToToday, muteOverdue } from './alerts';
 import { BACKUP_FORMAT, parseBackup } from './backup';
 import { formFromTask, newForm } from './editor';
 import { applyToTasks, planRepeats } from './repeat';
@@ -65,12 +65,16 @@ describe('摘要與日期', () => {
       mk({ date: '2026-11-10', important: true }), mk({ date: '2026-11-11', important: true }),
       mk({ date: '2026-11-01', deadline: true }), mk({ date: '2026-11-14', deadline: true }), mk({ date: '2026-11-15', deadline: true }),
     ];
-    expect(alertsSummary(buildAlerts(ts, TODAY))).toBe('過去 2 件重要未結 · 7 天內 2 件截止 · 1 件已過期');
-    expect(alertsSummary(buildAlerts([mk({ date: '2026-11-14', deadline: true })], TODAY))).toBe('7 天內 1 件截止');
+    expect(alertsLines(buildAlerts(ts, TODAY))).toEqual(['• 過去 2 項重要事件未結', '• 未來 7 天內有 2 個截止日']);
+    expect(alertsLines(buildAlerts([mk({ date: '2026-11-14', deadline: true })], TODAY))).toEqual(['• 未來 7 天內有 1 個截止日']);
+    // 7 天內沒有、只剩已過期的
+    expect(alertsLines(buildAlerts([mk({ date: '2026-11-01', deadline: true })], TODAY))).toEqual(['• 1 個截止日已過期']);
     expect(alertsEmpty(buildAlerts([mk()], TODAY))).toBe(true);
   });
   it('monthDay', () => {
-    expect(monthDay('2026-01-05')).toBe('1月5日');
+    expect(monthDay('2026-01-05')).toBe('1 月 5 日');
+    expect(monthDay('2026-11-30')).toBe('11 月 30 日');
+    expect(MONTH_DAY_WIDEST).toBe(monthDay('2026-11-30')); // 基準寬度就是雙位數的格式
   });
 });
 

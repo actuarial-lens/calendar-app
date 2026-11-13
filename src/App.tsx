@@ -257,7 +257,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           closing={alertsP.closing}
           onAck={() => void db.kv.put({ key: ALERTS_ACK, value: today })}
           onMoveAll={() => setMoveAsk(alerts.overdue)}
-          onMute={() => void run(muteOverdue(alerts.overdue, Date.now()))}
+          onMute={(t) => void run(muteOverdue([t], Date.now()))}
           onComplete={(t) => void run(A.completeTask(t, Date.now()))}
         />
       )}

@@ -40,21 +40,28 @@ export function buildAlerts(tasks: Task[], today: string): Alerts {
 
 export const alertsEmpty = (a: Alerts) => a.overdue.length === 0 && a.deadlines.length === 0;
 
-/** 標題列的摘要，例如「過去 2 件重要未結 · 7 天內 3 件截止 · 1 件已過期」 */
-export function alertsSummary(a: Alerts): string {
-  const parts: string[] = [];
-  if (a.overdue.length) parts.push(`過去 ${a.overdue.length} 件重要未結`);
+/**
+ * 標題列的摘要，一行一項，例如：
+ * 「• 過去 2 項重要事件未結」「• 未來 7 天內有 3 個截止日」
+ * 沒有的就不列；7 天內沒有、只剩已過期的，改列「• N 個截止日已過期」。
+ */
+export function alertsLines(a: Alerts): string[] {
+  const lines: string[] = [];
+  if (a.overdue.length) lines.push(`• 過去 ${a.overdue.length} 項重要事件未結`);
   const expired = a.deadlines.filter((d) => d.expired).length;
   const soon = a.deadlines.length - expired;
-  if (soon) parts.push(`${DEADLINE_DAYS} 天內 ${soon} 件截止`);
-  if (expired) parts.push(`${expired} 件已過期`);
-  return parts.join(' · ');
+  if (soon) lines.push(`• 未來 ${DEADLINE_DAYS} 天內有 ${soon} 個截止日`);
+  else if (expired) lines.push(`• ${expired} 個截止日已過期`);
+  return lines;
 }
 
-/** 例如 11月20日 */
+/** 例如 11 月 1 日（月、日前後有空格） */
 export function monthDay(iso: string): string {
-  return `${Number(iso.slice(5, 7))}月${Number(iso.slice(8))}日`;
+  return `${Number(iso.slice(5, 7))} 月 ${Number(iso.slice(8))} 日`;
 }
+
+/** 日期欄的基準寬度：用最寬的「11 月 30 日」撐開，個位數的日期後面的事項才會和雙位數的對齊 */
+export const MONTH_DAY_WIDEST = '11 月 30 日';
 
 /**
  * 全部移至本日：日期改成今天，延後天數加上相差的天數，時間不動。

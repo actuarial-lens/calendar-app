@@ -43,28 +43,41 @@ async def main():
         ])
         await page.reload(); await page.wait_for_selector('.alerts'); await page.wait_for_timeout(400)
         summary = await page.locator('.alerts-sum').inner_text()
-        check('摘要', summary.startswith('過去 2 件重要未結 · 7 天內 1 件截止 · 1 件已過期'), summary)
+        check('摘要兩行', summary.replace('▾','').split() == ['•','過去','2','項重要事件未結','•','未來','7','天內有','1','個截止日'], repr(summary))
         color = await page.locator('.alerts-sum').evaluate("e=>getComputedStyle(e).color")
         check('深琥珀色', color == 'rgb(154, 88, 0)', color)
         check('預設收合', await page.locator('.alerts-sum').get_attribute('aria-expanded') == 'false')
 
         await page.locator('.alerts-sum').click(); await page.wait_for_timeout(400)
         secs = await page.locator('.alerts-sec').all_inner_texts()
-        check('兩段', len(secs) == 2 and '過去重要A' in secs[0] and '過去重要B' in secs[0] and '過去普通F' not in secs[0], str(secs))
+        check('兩段、標題', len(secs) == 2 and secs[0].startswith('未結重要事件') and secs[1].startswith('未來 7 天內截止事件') and '過去重要A' in secs[0] and '過去重要B' in secs[0] and '過去普通F' not in secs[0], str(secs))
+        check('重要那段標題紅字', await page.locator('.alerts-h-red').evaluate("e=>getComputedStyle(e).color") == 'rgb(179, 38, 30)')
+        import re
+        check('日期格式「M 月 D 日」', len(re.findall(r'\d{1,2} 月 \d{1,2} 日', secs[0] + secs[1])) == 4, secs[0].replace('\n', ' / '))
         dl = await page.locator('.alerts-sec').nth(1).locator('li').all_inner_texts()
         check('截止：已過期在最上面、太遠的不列', len(dl) == 2 and '已過期' in dl[0] and '截止過期D' in dl[0] and '截止C' in dl[1], str(dl))
+        # 版面量測：右緣對齊、標題左緣對齊、已過期在標題右側
+        geo = await page.evaluate("""()=>{const r=e=>e.getBoundingClientRect();const q=s=>[...document.querySelectorAll(s)];
+          return {ack:r(q('.alerts-head .alerts-cap')[0]).right, caps:q('.alerts li .alerts-cap').map(e=>r(e).right), widths:q('.alerts li .alerts-cap').map(e=>Math.round(r(e).width)), ackW:Math.round(r(q('.alerts-head .alerts-cap')[0]).width),
+          titles:q('.alerts-title').map(e=>Math.round(r(e).left)), exp:(()=>{const e=q('.alerts-expired')[0];const t=e.previousElementSibling;return [r(t).right<=r(e).left, r(e).left-r(t).right]})(),
+          moveAll:r(q('.alerts-actions .alerts-cap')[0]).right, lastMute:r(q('.alerts-sec')[0].querySelectorAll('li .alerts-cap')[1]).bottom, moveTop:r(q('.alerts-actions .alerts-cap')[0]).top}}""")
+        check('已確認／已完成／不再通知 右緣同一條線', len({round(x) for x in [geo['ack']] + geo['caps'] + [geo['moveAll']]}) == 1, str(geo))
+        check('膠囊同寬', len(set(geo['widths'] + [geo['ackW']])) == 1, str(geo['widths']) + str(geo['ackW']))
+        check('標題左緣對齊（個位數與雙位數）', len(set(geo['titles'])) == 1, str(geo['titles']))
+        check('已過期在標題右側', geo['exp'][0] is True, str(geo['exp']))
+        check('全部移至本日在最後一個不再通知下方', geo['moveTop'] > geo['lastMute'], str(geo))
 
         # 截止事項的「已完成」
-        await page.locator('.alerts li', has_text='截止C').locator('.alerts-done').click(); await page.wait_for_timeout(500)
+        await page.locator('.alerts li', has_text='截止C').locator('.alerts-cap').click(); await page.wait_for_timeout(500)
         c = (await page.evaluate(GET, '截止C'))[0]
         check('已完成', c['done'] is True and await page.locator('.alerts li', has_text='截止C').count() == 0)
 
         # 全部移至本日：先確認；取消不動
-        await page.locator('.alerts-btn', has_text='全部移至本日').click(); await page.wait_for_selector('#confirm-title'); await page.wait_for_timeout(400)
+        await page.locator('.alerts-cap', has_text='全部移至本日').click(); await page.wait_for_selector('#confirm-title'); await page.wait_for_timeout(400)
         check('確認視窗', '2 件' in await page.locator('.del-text').inner_text())
         await page.locator('.del-actions .btn-text').click(); await page.wait_for_timeout(500)
         check('取消後沒移', (await page.evaluate(GET, '過去重要A'))[0]['date'] == d_3)
-        await page.locator('.alerts-btn', has_text='全部移至本日').click(); await page.wait_for_selector('#confirm-title'); await page.wait_for_timeout(400)
+        await page.locator('.alerts-cap', has_text='全部移至本日').click(); await page.wait_for_selector('#confirm-title'); await page.wait_for_timeout(400)
         await page.locator('.del-actions .btn-ghost').click(); await page.wait_for_timeout(700)
         a = (await page.evaluate(GET, '過去重要A'))[0]; bb = (await page.evaluate(GET, '過去重要B'))[0]
         check('移到今天、時間不變、延 N 天', a['date'] == today and a['time'] == '15:00' and a['delayDays'] == 3 and bb['time'] == '上午' and bb['delayDays'] == 2)
@@ -80,14 +93,14 @@ async def main():
         await swipe(cdp, box['x']+40, box['x']+260, y); await page.wait_for_timeout(500)
         await card.get_by_role('button', name='恢復').click(); await page.wait_for_timeout(700)
         check('恢復回原日期', (await page.evaluate(GET, '過去重要A'))[0]['date'] == d_3)
-        check('又列在重要未結', '過去 1 件重要未結' in await page.locator('.alerts-sum').inner_text())
+        check('又列在重要未結', '過去 1 項重要事件未結' in await page.locator('.alerts-sum').inner_text())
 
         # 不再通知
-        await page.locator('.alerts-btn', has_text='不再通知').click(); await page.wait_for_timeout(600)
-        check('不再通知', (await page.evaluate(GET, '過去重要A'))[0].get('muteOverdue') is True and '重要未結' not in await page.locator('.alerts-sum').inner_text())
+        await page.locator('.alerts li', has_text='過去重要A').locator('.alerts-cap', has_text='不再通知').click(); await page.wait_for_timeout(600)
+        check('不再通知（這一筆）', (await page.evaluate(GET, '過去重要A'))[0].get('muteOverdue') is True and '重要事件未結' not in await page.locator('.alerts-sum').inner_text())
 
         # 已確認：今天收起來、重新整理也不出現；明天（模擬：確認日期改成昨天）再出現
-        await page.locator('.alerts-ack').click(); await page.wait_for_timeout(600)
+        await page.locator('.alerts-head .alerts-cap').click(); await page.wait_for_timeout(600)
         check('已確認後收起', await page.locator('.alerts').count() == 0)
         await page.reload(); await page.wait_for_selector('.card'); await page.wait_for_timeout(600)
         check('重新整理後仍收起', await page.locator('.alerts').count() == 0)
@@ -104,7 +117,7 @@ async def main():
         await page.locator('.btn-primary').click(); await page.wait_for_timeout(700)
         tag = page.locator('.card', has_text='交報告').locator('.dl')
         check('卡片「截止」', await tag.inner_text() == '截止' and await tag.evaluate("e=>getComputedStyle(e).color") == 'rgb(154, 88, 0)')
-        check('提示框列入', '交報告' in await page.locator('.alerts').inner_text() or '7 天內 1 件截止' in await page.locator('.alerts-sum').inner_text())
+        check('提示框列入', '交報告' in await page.locator('.alerts').inner_text() or '未來 7 天內有 1 個截止日' in await page.locator('.alerts-sum').inner_text())
 
         # 重複事項：問範圍
         await page.locator('.btn-new').click(); await page.wait_for_selector('.sheet'); await page.wait_for_timeout(500)
