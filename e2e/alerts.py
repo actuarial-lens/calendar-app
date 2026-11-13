@@ -59,12 +59,12 @@ async def main():
         # 版面量測：右緣對齊、標題左緣對齊、已過期在標題右側
         geo = await page.evaluate("""()=>{const r=e=>e.getBoundingClientRect();const q=s=>[...document.querySelectorAll(s)];
           return {ack:r(q('.alerts-head .alerts-cap')[0]).right, caps:q('.alerts li .alerts-cap').map(e=>r(e).right), widths:q('.alerts li .alerts-cap').map(e=>Math.round(r(e).width)), ackW:Math.round(r(q('.alerts-head .alerts-cap')[0]).width),
-          titles:q('.alerts-title').map(e=>Math.round(r(e).left)), exp:(()=>{const e=q('.alerts-expired')[0];const d=e.previousElementSibling;const t=d.previousElementSibling;return [r(t).right<=r(d).left && r(d).right<=r(e).left && d.textContent==='·', r(d).left-r(t).right, r(e).left-r(d).right, Math.abs((r(t).top+r(t).bottom)/2-(r(e).top+r(e).bottom)/2)]})(),
+          titles:q('.alerts-title').map(e=>Math.round(r(e).left)), exp:(()=>{const e=q('.alerts-expired')[0];const d=e.previousElementSibling;const t=d.previousElementSibling;return [r(t).right<=r(d).left && r(d).right<=r(e).left && d.textContent==='·', r(d).left-r(t).right, r(e).left-r(d).right, r(d).width, parseFloat(getComputedStyle(d).fontSize)]})(),
           moveAll:r(q('.alerts-actions .alerts-cap')[0]).right, lastMute:r(q('.alerts-sec')[0].querySelectorAll('li .alerts-cap')[1]).bottom, moveTop:r(q('.alerts-actions .alerts-cap')[0]).top}}""")
         check('已確認／已完成／不再通知 右緣同一條線', len({round(x) for x in [geo['ack']] + geo['caps'] + [geo['moveAll']]}) == 1, str(geo))
         check('膠囊同寬', len(set(geo['widths'] + [geo['ackW']])) == 1, str(geo['widths']) + str(geo['ackW']))
         check('標題左緣對齊（個位數與雙位數）', len(set(geo['titles'])) == 1, str(geo['titles']))
-        check('「標題 · 已過期」依序排列、中心同高', geo['exp'][0] is True and geo['exp'][3] <= 0.5, str(geo['exp']))
+        check('「標題·已過期」依序排列、點佔一個全型位子（寬=字級）、前後無空格（墨跡中心同高見 expired_align.py）', geo['exp'][0] is True and abs(geo['exp'][1]) < 0.1 and abs(geo['exp'][2]) < 0.1 and abs(geo['exp'][3] - geo['exp'][4]) < 0.1, str(geo['exp']))
         check('全部移至本日在最後一個不再通知下方', geo['moveTop'] > geo['lastMute'], str(geo))
 
         # 截止事項的「已完成」

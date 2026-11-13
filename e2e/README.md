@@ -5,6 +5,7 @@
 - `editscope.py`（重複事項改內容問範圍）、`alerts.py`（重要未結＋截止提示框）、`heat.py`（週列／月曆深淺）：印 OK／FAIL，最後一行 `FAILS: []` 代表全過。
 - `capsule_center.py`：量測所有膠囊／按鈕的文字是否上下置中（截圖比對字的墨跡中心與膠囊中心，誤差 ≤ 1px 算置中；`-v` 印出每一顆）。改了任何按鈕、膠囊的 padding 或字級後要跑。
 - `tag_align.py`：卡片上分類文字後面的標示（重要｜截止日｜延 N 天｜↻ 每週，用「·」分開）：每項的上下中心和分類文字一致（≤0.5px），每個「·」左右空白一樣寬、所有空白差 ≤0.75px；加上重要卡片底色。可帶參數 `2`、`3`、`4` 指定螢幕像素密度。
+- `expired_align.py`：上方提示框「標題·已過期」：標題、「·」、「已過期」三者墨跡上下中心一致（≤0.5px）；「·」佔一個全型位子、前後無空格（`alerts.py` 量盒子寬）。可帶參數 `2`、`3`、`4`。
 - `e2e.py`、`e2e3.py`、`anim.py`：先 `npm run build && npx vite preview --port 4173`，再 `python3 e2e/e2e.py`
 - `offline.py`：用子路徑建置後在 4174 埠提供：
   `npx vite build --base=/calendar-app/ --outDir /tmp/sub/calendar-app && (cd /tmp/sub && python3 -m http.server 4174)`，再 `python3 e2e/offline.py`
