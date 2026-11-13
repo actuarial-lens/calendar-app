@@ -196,6 +196,87 @@ describe('從雲端還原（換手機）', () => {
   });
 });
 
+describe('還原：回到那一天（同一支手機）', () => {
+  /** 昨天（11/12）有一份備份：A、B、隨手記 n1；之後手機上誤刪 B、改錯 A 的標題、新增 C 與隨手記 n2 */
+  async function scenario() {
+    const s = fakeServer();
+    const p = await phone(s.server);
+    await p.db.tasks.bulkPut([task('A', { title: '原本的標題', updatedAt: 10 }), task('B', { title: '不能丟', updatedAt: 10 })]);
+    await p.db.notes.bulkPut([note('n1', { text: '昨天的字', updatedAt: 10 })]);
+    await saveSettings(p.db, { morningTime: '07:10' });
+    await p.actions.enable(CODE);
+    const { id } = await deriveKeys(CODE);
+    const m = s.store.get(id)!;
+    m.set('2026-11-12', m.get('2026-11-13')!); // 備份的日期是昨天
+    m.delete('2026-11-13');
+    // 今天的誤操作
+    await p.db.tasks.put(task('B', { title: '不能丟', updatedAt: 300, deletedAt: 300 }));
+    await p.db.tasks.put(task('A', { title: '改錯了', updatedAt: 301 }));
+    await p.db.tasks.put(task('C', { title: '今天新增', updatedAt: 302 }));
+    await p.db.notes.put(note('n1', { text: '今天改的', updatedAt: 303 }));
+    await p.db.notes.put(note('n2', { text: '今天新增的字', updatedAt: 304 }));
+    await saveSettings(p.db, { morningTime: '09:00' });
+    return { s, p };
+  }
+  const titles = async (db: AppDB) => Object.fromEntries((await db.tasks.toArray()).map((t) => [t.id, t.deletedAt ? `${t.title}(刪)` : t.title]));
+
+  it('合併模式救不回來（維持原行為）；預設就是合併', async () => {
+    const { p } = await scenario();
+    const msg = await p.actions.restore(CODE, '2026-11-12');
+    expect(msg).toBe('雲端的資料這支手機都已經有了，沒有需要還原的。');
+    expect(await titles(p.db)).toEqual({ A: '改錯了', B: '不能丟(刪)', C: '今天新增' });
+    expect((await p.actions.restoreWithUndo(CODE, '2026-11-12')).inverse).toBeUndefined();
+  });
+
+  it('回到那一天：刪的回來、改的換回、新增的保留；updatedAt 都是現在；設定也換回；結果文字', async () => {
+    const { p } = await scenario();
+    const r = await p.actions.restoreWithUndo(CODE, '2026-11-12', 'revert');
+    expect(r.text).toBe('已回到 11/12（四）：換回事項 2、隨手記 1；保留之後新增的事項 1、隨手記 1。');
+    expect(await titles(p.db)).toEqual({ A: '原本的標題', B: '不能丟', C: '今天新增' });
+    const all = new Map((await p.db.tasks.toArray()).map((t) => [t.id, t]));
+    expect(all.get('B')!.deletedAt).toBeUndefined();
+    expect(all.get('A')!.updatedAt).toBe(1_800_000_000_000);
+    expect(all.get('C')!.updatedAt).toBe(302); // 新增的完全不動
+    const ns = new Map((await p.db.notes.toArray()).map((n) => [n.id, n]));
+    expect(ns.get('n1')).toMatchObject({ text: '昨天的字', updatedAt: 1_800_000_000_000 });
+    expect(ns.get('n2')!.text).toBe('今天新增的字');
+    expect((await loadSettings(p.db)).morningTime).toBe('07:10');
+    expect(p.uploader.hasPending()).toBe(true); // 資料一定有變：排上傳
+    expect(r.inverse).toBeDefined();
+  });
+
+  it('復原這次還原：資料和還原前完全一樣（含新增的列不被誤刪）', async () => {
+    const { p } = await scenario();
+    const snap = async () => JSON.stringify([(await p.db.tasks.toArray()).sort((a, b) => (a.id < b.id ? -1 : 1)), (await p.db.notes.toArray()).sort((a, b) => (a.id < b.id ? -1 : 1))]);
+    const before = await snap();
+    const r = await p.actions.restoreWithUndo(CODE, '2026-11-12', 'revert');
+    expect(await snap()).not.toBe(before);
+    expect(await p.actions.undoRestore(r.inverse!)).toBe('已復原到還原之前的狀態。');
+    expect(await snap()).toBe(before);
+    expect(p.uploader.hasPending()).toBe(true);
+  });
+
+  it('全新手機也能選「回到那一天」：備份裡有的都放進來，並用這組還原碼開啟；復原後回到空的', async () => {
+    const { s } = await scenario();
+    const q = await phone(s.server);
+    const r = await q.actions.restoreWithUndo(CODE, '2026-11-12', 'revert');
+    expect(r.text).toBe('已回到 11/12（四）：換回事項 2、隨手記 1；保留之後新增的事項 0、隨手記 0。');
+    expect((await loadCloudState(q.db))!.code).toBe(CODE);
+    expect(await q.db.tasks.count()).toBe(2);
+    await q.actions.undoRestore(r.inverse!);
+    expect(await q.db.tasks.count()).toBe(0);
+    expect(await q.db.notes.count()).toBe(0);
+  });
+
+  it('失敗時不動資料：沒有那一天、還原碼不對', async () => {
+    const { p } = await scenario();
+    const before = await titles(p.db);
+    expect((await p.actions.restoreWithUndo(CODE, '2020-01-01', 'revert')).text).toBe('找不到這組還原碼的備份');
+    expect((await p.actions.restoreWithUndo('bad', '2026-11-12', 'revert')).text).toBe('還原碼格式不對');
+    expect(await titles(p.db)).toEqual(before);
+  });
+});
+
 describe('更換還原碼、關閉', () => {
   it('更換：用新碼上傳成功後才切換，舊代號的備份被刪除；伺服器上只剩新代號', async () => {
     const s = fakeServer();

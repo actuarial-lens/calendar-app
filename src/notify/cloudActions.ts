@@ -1,10 +1,12 @@
 import type { AppDB } from '../db/db';
 import { commit } from '../db/changes';
+import type { Changes } from '../lib/changes';
 import { loadSettings, saveSettings } from '../db/settings';
 import * as cloudApi from '../lib/cloudApi';
 import type { CloudConfig, RemoteItem } from '../lib/cloudApi';
 import {
-  CLOUD_KEY, CloudError, decryptBackup, deriveKeys, normalizeCode, planCloudRestore, restoreSummary, settingsPatchFrom, type CloudBackupState,
+  CLOUD_KEY, CloudError, UNDO_RESTORE_TEXT, decryptBackup, deriveKeys, normalizeCode, planCloudRestore, planCloudRevert, restoreSummary, revertSummary, settingsPatchFrom,
+  type CloudBackupState,
 } from '../lib/cloudBackup';
 import { CloudUploader, type UploaderDeps } from './cloudSync';
 
@@ -57,6 +59,15 @@ export function createUploaderDeps(db: AppDB, server: CloudServer, now: () => nu
   };
 }
 
+/** 還原方式：合併（保留手機上較新的修改）／回到那一天（備份裡有的每一筆換回那天的樣子） */
+export type RestoreMode = 'merge' | 'revert';
+
+export interface RestoreResult {
+  text: string;
+  /** 回到那一天成功時的反向變更，交給 undoRestore 就能恢復成還原之前 */
+  inverse?: Changes;
+}
+
 export interface CloudActions {
   /** 使用者按「我已存好」：真正開啟，並立刻上傳第一份 */
   enable(code: string): Promise<string>;
@@ -67,7 +78,11 @@ export interface CloudActions {
   disable(deleteRemote: boolean): Promise<string>;
   /** 查詢這組還原碼在雲端有哪些日期（新到舊）；格式不對、查無資料會丟 CloudError */
   lookup(input: string): Promise<{ code: string; items: RemoteItem[] }>;
-  restore(code: string, day: string): Promise<string>;
+  /** 還原並回傳結果文字（合併為預設）；要拿到「復原」用的反向變更時用 restoreWithUndo */
+  restore(code: string, day: string, mode?: RestoreMode): Promise<string>;
+  restoreWithUndo(code: string, day: string, mode?: RestoreMode): Promise<RestoreResult>;
+  /** 復原「回到那一天」：套用反向變更，並排上傳 */
+  undoRestore(inverse: Changes): Promise<string>;
 }
 
 export function createCloudActions(db: AppDB, uploader: CloudUploader, server: CloudServer = realServer, now: () => number = Date.now): CloudActions {
@@ -80,6 +95,42 @@ export function createCloudActions(db: AppDB, uploader: CloudUploader, server: C
     const s = await loadCloudState(db);
     if (!s) throw new CloudError('config', '尚未開啟雲端備份');
     return s;
+  };
+
+  const restoreWithUndo = async (input: string, day: string, mode: RestoreMode = 'merge'): Promise<RestoreResult> => {
+    try {
+      const code = normalizeCode(input);
+      if (!code) return { text: '還原碼格式不對' };
+      const cfg = await needConfig();
+      const { id, key } = await deriveKeys(code);
+      const blob = await server.get(cfg, id, day);
+      const { backup } = await decryptBackup(blob, key);
+
+      // 這支手機還沒開啟雲端備份：用這組還原碼開啟（已經用別組碼開啟的不改）。先寫狀態，之後資料一變就會排上傳
+      const had = await loadCloudState(db);
+      if (!had) await db.kv.put({ key: CLOUD_KEY, value: { code, enabledAt: now() } satisfies CloudBackupState });
+
+      const [tasks, notes] = await Promise.all([db.tasks.toArray(), db.notes.toArray()]);
+      const patch = settingsPatchFrom(backup);
+
+      if (mode === 'revert') {
+        const plan = planCloudRevert(backup, tasks, notes, now());
+        const inverse = await commit(db, plan.changes);
+        if (Object.keys(patch).length) await saveSettings(db, patch);
+        uploader.markDirty(); // 回到那一天資料一定有變：排上傳
+        return { text: revertSummary(day, plan), inverse };
+      }
+
+      const plan = planCloudRestore(backup, tasks, notes);
+      await commit(db, plan.changes);
+      if (Object.keys(patch).length) await saveSettings(db, patch);
+      if (!had) uploader.markDirty();
+      return {
+        text: restoreSummary(plan) + (had ? '' : plan.changes.putTasks.length + plan.changes.putNotes.length === 0 ? '這支手機已用這組還原碼開啟雲端備份。' : '。這支手機已用這組還原碼開啟雲端備份。'),
+      };
+    } catch (e) {
+      return { text: errText(e) };
+    }
   };
 
   return {
@@ -154,26 +205,17 @@ export function createCloudActions(db: AppDB, uploader: CloudUploader, server: C
       return { code, items };
     },
 
-    async restore(input, day) {
+    async restore(input, day, mode = 'merge') {
+      return (await restoreWithUndo(input, day, mode)).text;
+    },
+
+    restoreWithUndo,
+
+    async undoRestore(inverse) {
       try {
-        const code = normalizeCode(input);
-        if (!code) return '還原碼格式不對';
-        const cfg = await needConfig();
-        const { id, key } = await deriveKeys(code);
-        const blob = await server.get(cfg, id, day);
-        const { backup } = await decryptBackup(blob, key);
-
-        // 這支手機還沒開啟雲端備份：用這組還原碼開啟（已經用別組碼開啟的不改）。先寫狀態，之後資料一變就會排上傳
-        const had = await loadCloudState(db);
-        if (!had) await db.kv.put({ key: CLOUD_KEY, value: { code, enabledAt: now() } satisfies CloudBackupState });
-
-        const [tasks, notes] = await Promise.all([db.tasks.toArray(), db.notes.toArray()]);
-        const plan = planCloudRestore(backup, tasks, notes);
-        await commit(db, plan.changes);
-        const patch = settingsPatchFrom(backup);
-        if (Object.keys(patch).length) await saveSettings(db, patch);
-        if (!had) uploader.markDirty();
-        return restoreSummary(plan) + (had ? '' : plan.changes.putTasks.length + plan.changes.putNotes.length === 0 ? '這支手機已用這組還原碼開啟雲端備份。' : '。這支手機已用這組還原碼開啟雲端備份。');
+        await commit(db, inverse);
+        uploader.markDirty();
+        return UNDO_RESTORE_TEXT;
       } catch (e) {
         return errText(e);
       }

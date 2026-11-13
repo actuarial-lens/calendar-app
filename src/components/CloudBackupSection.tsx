@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { backupTimeText, formatCode, generateCode, isCloudReady, restoreItemText, type CloudBackupState } from '../lib/cloudBackup';
+import { backupTimeText, formatCode, generateCode, isCloudReady, restoreItemText, revertConfirmText, type CloudBackupState } from '../lib/cloudBackup';
+import type { Changes } from '../lib/changes';
 import type { RemoteItem } from '../lib/cloudApi';
-import type { CloudActions } from '../notify/cloudActions';
+import type { CloudActions, RestoreMode } from '../notify/cloudActions';
 import { usePresence } from '../lib/usePresence';
 import type { Settings } from '../types';
 import { Sheet } from './Sheet';
@@ -191,13 +192,21 @@ function CodeSheet({ code, mode, closing, busy, onClose, onSaved }: { code: stri
   );
 }
 
+const MODES: { mode: RestoreMode; label: string; hint: string }[] = [
+  { mode: 'merge', label: '合併', hint: '保留這支手機上較新的修改，只補回手機上沒有的。換新手機時用這個。' },
+  { mode: 'revert', label: '回到那一天', hint: '把備份裡的每一筆換回那天的樣子：之後刪掉的會回來、之後改的會換回去；那天之後才新增的會保留。' },
+];
+
 function RestoreSheet({ closing, initialCode, liveCount, actions, onClose, onDone }: { closing: boolean; initialCode: string; liveCount: number; actions: CloudActions; onClose: () => void; onDone: (text: string) => void }) {
   const [input, setInput] = useState(initialCode);
   const [found, setFound] = useState<{ code: string; items: RemoteItem[] } | null>(null);
   const [day, setDay] = useState('');
+  const [mode, setMode] = useState<RestoreMode>('merge');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  /** 「回到那一天」完成後：留在面板上顯示結果與「復原這次還原」，面板關閉就消失 */
+  const [result, setResult] = useState<{ text: string; inverse?: Changes } | null>(null);
 
   const lookup = async () => {
     setBusy(true);
@@ -208,6 +217,7 @@ function RestoreSheet({ closing, initialCode, liveCount, actions, onClose, onDon
       const r = await actions.lookup(input);
       setFound(r);
       setDay(r.items[0].day);
+      setMode('merge');
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : '查詢失敗，請稍後再試。');
     } finally {
@@ -218,64 +228,102 @@ function RestoreSheet({ closing, initialCode, liveCount, actions, onClose, onDon
   const restore = async () => {
     if (!found) return;
     setBusy(true);
-    const text = await actions.restore(found.code, day);
+    const r = await actions.restoreWithUndo(found.code, day, mode);
     setBusy(false);
-    onDone(text);
+    if (mode === 'revert') setResult(r);
+    else onDone(r.text);
   };
 
+  const undo = async () => {
+    if (!result?.inverse) return;
+    setBusy(true);
+    const text = await actions.undoRestore(result.inverse);
+    setBusy(false);
+    setResult({ text });
+  };
+
+  const close = () => (result ? onDone(result.text) : onClose());
+
   return (
-    <Sheet closing={closing} onClose={onClose} labelledBy="rs-title" scrimLabel="關閉">
+    <Sheet closing={closing} onClose={close} labelledBy="rs-title" scrimLabel="關閉">
       <h2 id="rs-title" className="sheet-title">從雲端還原</h2>
-      <div className="field">
-        <label className="field-label" htmlFor="restore-code">還原碼</label>
-        <input
-          id="restore-code"
-          className="text-input code-input"
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            setFound(null);
-            setError('');
-            setConfirming(false);
-          }}
-        />
-      </div>
-      {error && <p className="lead-warn" id="restore-error" role="alert">{error}</p>}
-      {!found && (
-        <div className="del-actions">
-          <button type="button" className="btn-primary" id="restore-lookup" disabled={busy || input.trim() === ''} onClick={lookup}>查詢</button>
-          <button type="button" className="btn-text" onClick={onClose}>取消</button>
-        </div>
-      )}
-      {found && !confirming && (
+      {result ? (
         <>
-          <div className="field">
-            <span className="field-label" id="rs-days">選擇要還原的備份</span>
-            <div className="restore-list" role="radiogroup" aria-labelledby="rs-days">
-              {found.items.map((it) => (
-                <button key={it.day} type="button" role="radio" aria-checked={day === it.day} className="restore-item" data-day={it.day} onClick={() => setDay(it.day)}>
-                  {restoreItemText(it.day, it.updatedAt)}
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="del-text" id="restore-result" role="status">{result.text}</p>
           <div className="del-actions">
-            <button type="button" className="btn-primary" id="restore-go" disabled={busy} onClick={() => (liveCount > 0 ? setConfirming(true) : void restore())}>還原</button>
-            <button type="button" className="btn-text" onClick={onClose}>取消</button>
+            {result.inverse && (
+              <button type="button" className="btn-ghost" id="restore-undo" disabled={busy} onClick={undo}>復原這次還原</button>
+            )}
+            <button type="button" className="btn-primary" id="restore-done" onClick={close}>完成</button>
           </div>
         </>
-      )}
-      {found && confirming && (
+      ) : (
         <>
-          <p className="del-text" id="restore-confirm">這支手機已有 {liveCount} 筆資料。還原會合併進來，不會刪除現有資料；同一筆以較新的修改為準。</p>
-          <div className="del-actions">
-            <button type="button" className="btn-primary" id="restore-confirm-go" disabled={busy} onClick={restore}>確定還原</button>
-            <button type="button" className="btn-text" onClick={() => setConfirming(false)}>返回</button>
+          <div className="field">
+            <label className="field-label" htmlFor="restore-code">還原碼</label>
+            <input
+              id="restore-code"
+              className="text-input code-input"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setFound(null);
+                setError('');
+                setConfirming(false);
+              }}
+            />
           </div>
+          {error && <p className="lead-warn" id="restore-error" role="alert">{error}</p>}
+          {!found && (
+            <div className="del-actions">
+              <button type="button" className="btn-primary" id="restore-lookup" disabled={busy || input.trim() === ''} onClick={lookup}>查詢</button>
+              <button type="button" className="btn-text" onClick={onClose}>取消</button>
+            </div>
+          )}
+          {found && !confirming && (
+            <>
+              <div className="field">
+                <span className="field-label" id="rs-days">選擇要還原的備份</span>
+                <div className="restore-list" role="radiogroup" aria-labelledby="rs-days">
+                  {found.items.map((it) => (
+                    <button key={it.day} type="button" role="radio" aria-checked={day === it.day} className="restore-item" data-day={it.day} onClick={() => setDay(it.day)}>
+                      {restoreItemText(it.day, it.updatedAt)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field">
+                <span className="field-label" id="rs-mode">還原方式</span>
+                <div className="restore-list restore-modes" role="radiogroup" aria-labelledby="rs-mode">
+                  {MODES.map((m) => (
+                    <button key={m.mode} type="button" role="radio" aria-checked={mode === m.mode} className="restore-item restore-mode" data-mode={m.mode} onClick={() => setMode(m.mode)}>
+                      <span className="restore-mode-label">{m.label}</span>
+                      <span className="restore-mode-hint">{m.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="del-actions">
+                <button type="button" className="btn-primary" id="restore-go" disabled={busy} onClick={() => (mode === 'revert' || liveCount > 0 ? setConfirming(true) : void restore())}>還原</button>
+                <button type="button" className="btn-text" onClick={onClose}>取消</button>
+              </div>
+            </>
+          )}
+          {found && confirming && (
+            <>
+              <p className="del-text" id="restore-confirm">
+                {mode === 'revert' ? revertConfirmText(day) : `這支手機已有 ${liveCount} 筆資料。還原會合併進來，不會刪除現有資料；同一筆以較新的修改為準。`}
+              </p>
+              <div className="del-actions">
+                <button type="button" className="btn-primary" id="restore-confirm-go" disabled={busy} onClick={restore}>{mode === 'revert' ? '回到那一天' : '確定還原'}</button>
+                <button type="button" className="btn-text" onClick={() => setConfirming(false)}>返回</button>
+              </div>
+            </>
+          )}
         </>
       )}
     </Sheet>

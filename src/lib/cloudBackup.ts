@@ -1,4 +1,5 @@
 import { LEAD_OPTIONS, type Note, type Settings, type Task } from '../types';
+import type { Changes } from './changes';
 import { planImport, validNote, validTask, type ImportPlan } from './backup';
 import { dayLabel, formatHM, toISO } from './dates';
 
@@ -222,6 +223,71 @@ export function restoreSummary(p: RestorePlan): string {
   if (n === 0 && p.changes.putTasks.length === 0 && p.changes.putNotes.length === 0) return '雲端的資料這支手機都已經有了，沒有需要還原的。';
   return `已還原：新增事項 ${p.shownAddedTasks}、更新 ${p.updatedTasks}；新增隨手記 ${p.shownAddedNotes}、更新 ${p.updatedNotes}`;
 }
+
+// ---------- 還原：回到那一天 ----------
+export interface RevertPlan {
+  changes: Changes;
+  /** 顯示用的件數：換回的（有寫入、且不是「手機上本來就沒有的刪除紀錄」） */
+  revertedTasks: number;
+  revertedNotes: number;
+  /** 備份裡沒有、手機上有（那天之後才新增、沒被刪掉）而保留不動的 */
+  keptTasks: number;
+  keptNotes: number;
+}
+
+/** 除了 updatedAt 之外，兩筆紀錄的每個欄位都一樣（undefined 和沒有這個欄位視為相同） */
+function sameExceptUpdatedAt(a: object, b: object): boolean {
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  const keys = new Set([...Object.keys(x), ...Object.keys(y)]);
+  keys.delete('updatedAt');
+  for (const k of keys) if (JSON.stringify(x[k]) !== JSON.stringify(y[k])) return false;
+  return true;
+}
+
+/**
+ * 「回到那一天」：備份裡的每一筆都換回備份的樣子（updatedAt 設成 now，之後的上傳與匯入才會以它為準）。
+ * 備份裡已刪除的就維持已刪除；手機上刪掉、備份裡沒刪的會回來。
+ * 內容完全相同的不寫入；手機上有、備份裡沒有的（那天之後新增的）完全不動。
+ */
+export function planCloudRevert(backup: Pick<CloudBackup, 'tasks' | 'notes'>, tasks: Task[], notes: Note[], now: number): RevertPlan {
+  const haveT = new Map(tasks.map((t) => [t.id, t]));
+  const haveN = new Map(notes.map((n) => [n.id, n]));
+  const putTasks: Task[] = [];
+  const putNotes: Note[] = [];
+  let revertedTasks = 0;
+  let revertedNotes = 0;
+  for (const t of backup.tasks) {
+    const cur = haveT.get(t.id);
+    if (cur && sameExceptUpdatedAt(cur, t)) continue;
+    putTasks.push({ ...t, updatedAt: now });
+    if (cur || !t.deletedAt) revertedTasks++;
+  }
+  for (const n of backup.notes) {
+    const cur = haveN.get(n.id);
+    if (cur && sameExceptUpdatedAt(cur, n)) continue;
+    putNotes.push({ ...n, updatedAt: now });
+    if (cur || !n.deletedAt) revertedNotes++;
+  }
+  const inT = new Set(backup.tasks.map((t) => t.id));
+  const inN = new Set(backup.notes.map((n) => n.id));
+  return {
+    changes: { putTasks, putNotes, delTaskIds: [], delNoteIds: [] },
+    revertedTasks,
+    revertedNotes,
+    keptTasks: tasks.filter((t) => !inT.has(t.id) && !t.deletedAt).length,
+    keptNotes: notes.filter((n) => !inN.has(n.id) && !n.deletedAt).length,
+  };
+}
+
+export const revertSummary = (day: string, p: RevertPlan): string =>
+  `已回到 ${dayLabel(day)}：換回事項 ${p.revertedTasks}、隨手記 ${p.revertedNotes}；保留之後新增的事項 ${p.keptTasks}、隨手記 ${p.keptNotes}。`;
+
+/** 按下「回到那一天」之後的確認文字 */
+export const revertConfirmText = (day: string): string =>
+  `要把資料回到 ${dayLabel(day)}的狀態嗎？備份裡有的事項與隨手記會換回那天的內容；那天之後新增的會保留。`;
+
+export const UNDO_RESTORE_TEXT = '已復原到還原之前的狀態。';
 
 // ---------- 小工具 ----------
 /** 雲端備份只需要伺服器網址與密碼（公鑰不需要，所以不用 isPushConfigured） */

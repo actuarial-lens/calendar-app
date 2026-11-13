@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { listBackups, putBackup, getBackup, deleteBackups } from './cloudApi';
 import {
   CODE_ALPHABET, CloudError, backupHash, backupTimeText, buildCloudBackup, decryptBackup, deriveKeys, encryptBackup, formatCode, generateCode,
-  isCloudReady, normalizeCode, parseCloudBackup, planCloudRestore, restoreItemText, restoreSummary, settingsPatchFrom, b64uDecode, b64uEncode,
+  isCloudReady, normalizeCode, parseCloudBackup, planCloudRestore, planCloudRevert, restoreItemText, restoreSummary, revertConfirmText, revertSummary, settingsPatchFrom, b64uDecode, b64uEncode,
 } from './cloudBackup';
 import { DEFAULT_SETTINGS, type Note, type Task } from '../types';
 
@@ -256,6 +256,84 @@ describe('還原：合併（含刪除紀錄）', () => {
     const t = mk({ id: 'a' });
     const plan = planCloudRestore(buildCloudBackup([t], [], SETTINGS, 1), [t], []);
     expect(restoreSummary(plan)).toBe('雲端的資料這支手機都已經有了，沒有需要還原的。');
+  });
+});
+
+describe('還原：回到那一天', () => {
+  const NOW = 5000;
+  const mk = (id: string, over: Partial<Task> = {}) => task(id, { updatedAt: 100, ...over });
+  const backupOf = (tasks: Task[], notes: Note[] = []) => buildCloudBackup(tasks, notes, SETTINGS, 1);
+  const byId = (plan: ReturnType<typeof planCloudRevert>) => new Map(plan.changes.putTasks.map((t) => [t.id, t]));
+
+  it('今天誤刪 B → 回到昨天：B 回來（deletedAt 消失、updatedAt = now）', () => {
+    const backup = backupOf([mk('B', { title: '重要的事' })]);
+    const local = [mk('B', { title: '重要的事', deletedAt: 300, updatedAt: 300 })]; // 手機上的刪除比較新：合併救不回來
+    expect(planCloudRestore(backup, local, []).changes.putTasks).toEqual([]);
+    const plan = planCloudRevert(backup, local, [], NOW);
+    const b = byId(plan).get('B')!;
+    expect(b.deletedAt).toBeUndefined();
+    expect('deletedAt' in b).toBe(false);
+    expect(b).toMatchObject({ title: '重要的事', updatedAt: NOW });
+    expect(plan).toMatchObject({ revertedTasks: 1, keptTasks: 0 });
+  });
+  it('今天改錯標題 → 回到昨天：標題換回', () => {
+    const backup = backupOf([mk('A', { title: '原本的標題' })]);
+    const local = [mk('A', { title: '改錯了', updatedAt: 400 })];
+    expect(planCloudRestore(backup, local, []).changes.putTasks).toEqual([]);
+    const plan = planCloudRevert(backup, local, [], NOW);
+    expect(byId(plan).get('A')).toMatchObject({ title: '原本的標題', updatedAt: NOW });
+  });
+  it('今天新增的 C（備份沒有）→ 保留不動，不在寫入清單、不被刪除，件數算「保留」', () => {
+    const backup = backupOf([mk('A')], [note('n1')]);
+    const local = [mk('A'), mk('C'), mk('C-dead', { deletedAt: 9 })];
+    const plan = planCloudRevert(backup, local, [note('n1'), note('n-new')], NOW);
+    expect(plan.changes.putTasks).toEqual([]);
+    expect(plan.changes.delTaskIds).toEqual([]);
+    expect(plan.changes.delNoteIds).toEqual([]);
+    expect(plan).toMatchObject({ keptTasks: 1, keptNotes: 1 }); // C 與 n-new；已刪除的 C-dead 不算
+  });
+  it('備份裡已刪除的 D、手機上還在 → 回到那天後 D 變成已刪除（保留備份裡的 deletedAt）', () => {
+    const backup = backupOf([mk('D', { deletedAt: 50, updatedAt: 50 })]);
+    const plan = planCloudRevert(backup, [mk('D', { updatedAt: 200 })], [], NOW);
+    expect(byId(plan).get('D')).toMatchObject({ deletedAt: 50, updatedAt: NOW });
+    expect(plan.revertedTasks).toBe(1);
+  });
+  it('內容相同（只差 updatedAt）的不寫入；件數只算有寫入的', () => {
+    const backup = backupOf([mk('same', { updatedAt: 100 }), mk('diff', { title: '舊' })], [note('ns', { updatedAt: 100 }), note('nd', { text: '舊' })]);
+    const local = [mk('same', { updatedAt: 999 }), mk('diff', { title: '新', updatedAt: 999 })];
+    const plan = planCloudRevert(backup, local, [note('ns', { updatedAt: 999 }), note('nd', { text: '新', updatedAt: 999 })], NOW);
+    expect([...byId(plan).keys()]).toEqual(['diff']);
+    expect(plan.changes.putNotes.map((n) => n.id)).toEqual(['nd']);
+    expect(plan).toMatchObject({ revertedTasks: 1, revertedNotes: 1 });
+  });
+  it('其他欄位（備註、完成、重複設定、undefined 與沒有欄位）也比對', () => {
+    const base = mk('R', { note: '甲', done: false });
+    const backup = backupOf([base]);
+    expect(planCloudRevert(backup, [{ ...base, note: '乙' }], [], NOW).revertedTasks).toBe(1);
+    expect(planCloudRevert(backup, [{ ...base, done: true }], [], NOW).revertedTasks).toBe(1);
+    expect(planCloudRevert(backup, [{ ...base, important: true }], [], NOW).revertedTasks).toBe(1);
+    expect(planCloudRevert(backup, [{ ...base, deletedAt: undefined, updatedAt: 7 }], [], NOW).revertedTasks).toBe(0);
+  });
+  it('手機上沒有的備份紀錄：事項照放進去；已刪除的放進去但不算進「換回」的件數', () => {
+    const backup = backupOf([mk('n'), mk('x', { deletedAt: 3 })], [note('nn'), note('nx', { deletedAt: 3 })]);
+    const plan = planCloudRevert(backup, [], [], NOW);
+    expect(plan.changes.putTasks.map((t) => t.id).sort()).toEqual(['n', 'x']);
+    expect(plan.changes.putNotes.map((n) => n.id).sort()).toEqual(['nn', 'nx']);
+    expect(plan.changes.putTasks.every((t) => t.updatedAt === NOW)).toBe(true);
+    expect(plan).toMatchObject({ revertedTasks: 1, revertedNotes: 1, keptTasks: 0, keptNotes: 0 });
+  });
+  it('隨手記也一樣：誤刪回來、改錯換回', () => {
+    const backup = backupOf([], [note('a', { text: '原文' }), note('b', { text: '要回來' })]);
+    const plan = planCloudRevert(backup, [], [note('a', { text: '改過', updatedAt: 300 }), note('b', { text: '要回來', deletedAt: 300, updatedAt: 300 })], NOW);
+    const m = new Map(plan.changes.putNotes.map((n) => [n.id, n]));
+    expect(m.get('a')).toMatchObject({ text: '原文', updatedAt: NOW });
+    expect('deletedAt' in m.get('b')!).toBe(false);
+    expect(plan.revertedNotes).toBe(2);
+  });
+  it('結果與確認文字', () => {
+    const plan = planCloudRevert(backupOf([mk('A', { title: 'x' })]), [mk('A', { title: 'y' }), mk('C')], [], NOW);
+    expect(revertSummary('2026-11-12', plan)).toBe('已回到 11/12（四）：換回事項 1、隨手記 0；保留之後新增的事項 1、隨手記 0。');
+    expect(revertConfirmText('2026-11-12')).toBe('要把資料回到 11/12（四）的狀態嗎？備份裡有的事項與隨手記會換回那天的內容；那天之後新增的會保留。');
   });
 });
 
