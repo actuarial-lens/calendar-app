@@ -544,7 +544,9 @@ input { caret-color: var(--blue); accent-color: var(--blue); }
 .date-chip::-webkit-datetime-edit { padding: 0; }
 
 /* 重複事項 */
-.card .rep { font-size: 11px; color: var(--text-2); letter-spacing: 0.04em; }
+.card .rep { display: inline-flex; align-items: center; gap: 3px; position: relative; top: 1.25px; font-size: 11px; color: var(--text-2); letter-spacing: 0.04em; line-height: 1; }
+.card .rep-i { flex: none; position: relative; top: 0.5px; }
+.card .rep-t { position: relative; top: -0.25px; } /* 符號與文字的中心都對準分類文字（pill_align.py 量過） */
 .field-hint { margin: 2px 2px 0; font-size: 12px; line-height: 1.6; color: var(--text-2); }
 .del-text { margin: 0; font-size: 15px; line-height: 1.7; }
 .del-actions { display: flex; flex-direction: column; gap: 10px; }

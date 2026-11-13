@@ -1,4 +1,4 @@
-"""卡片上「分類」文字與右邊膠囊（重要／截止／延 N 天）裡的文字是否等高：量墨跡的上下中心（px，正 = 膠囊字偏下）"""
+"""卡片上「分類」文字與右邊的膠囊（重要／截止／延 N 天）、重複標記（符號＋文字）是否同一個中心：量墨跡的上下中心（px，正 = 偏下），每項都要 ≤0.3px"""
 import asyncio, io, math, sys
 import numpy as np
 from playwright.async_api import async_playwright
@@ -39,6 +39,11 @@ async def main():
                 return await loc.first.bounding_box() if await loc.count() else None
             cat = await box('.cat')
             cc = ink_center(a, int((cat['y'] - cy) * SCALE), int((cat['y'] + cat['height'] - cy) * SCALE), int((cat['x'] - cx) * SCALE), int((cat['x'] + cat['width'] - cx) * SCALE))
+            if title == '全部都有':
+                rr = await card.locator('.rep').evaluate("""e=>{return [e.querySelector('.rep-i'),e.querySelector('.rep-t')].map(n=>{const x=n.getBoundingClientRect();return [x.x,x.y,x.width,x.height]})}""")
+                for nm, (rx, ry, rw, rh) in zip(['符號', '文字'], rr):
+                    rc = ink_center(a, int((ry - cy) * SCALE), int((ry + rh - cy) * SCALE), int((rx - cx) * SCALE), int((rx + rw - cx) * SCALE))
+                    d = round((rc - cc) / SCALE, 2); res.append(('全部都有', '重複' + nm, d, d, 0))
             for sel, name in [('.pill.imp', '重要'), ('.pill.dl', '截止'), ('.pill.delay', '延 N 天')]:
                 bx = await box(sel)
                 if not bx: continue

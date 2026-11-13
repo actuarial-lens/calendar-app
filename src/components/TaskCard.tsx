@@ -43,7 +43,16 @@ export function TaskCard({ task, phase, open, anyOpen, actions, startActions, op
               {task.important && <span className="pill imp">重要</span>}
               {task.deadline && <span className="pill dl">截止</span>}
               {!task.done && task.delayDays > 0 && <span className="pill delay">延 {task.delayDays} 天</span>}
-              {task.repeat && <span className="rep">↻ {REPEAT_LABEL[task.repeat.freq]}</span>}
+              {task.repeat && (
+                <span className="rep">
+                  {/* 符號用 SVG：各手機的「↻」字形不同，位置會跑掉；SVG 的中心是固定的 */}
+                  <svg className="rep-i" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M10 6a4 4 0 1 1-1.17-2.83" />
+                    <path d="M10 1.5v2.2H7.8" />
+                  </svg>
+                  <span className="rep-t">{REPEAT_LABEL[task.repeat.freq]}</span>
+                </span>
+              )}
             </div>
             <span className="time">{task.time}</span>
           </div>
