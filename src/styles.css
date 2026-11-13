@@ -365,10 +365,8 @@ input::placeholder { color: #7C837E; }
 .alerts-date-sizer { height: 0; overflow: hidden; visibility: hidden; }
 .alerts-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .alerts-title { flex: 0 1 auto; min-width: 0; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.alerts-expired {
-  flex: none; box-sizing: border-box; height: 20px; padding: 0 8px 1px; border-radius: 999px;
-  display: inline-flex; align-items: center; font-size: 11px; line-height: 1; color: var(--card); background: var(--amber);
-}
+.alerts-sep { flex: none; color: var(--text-2); font-size: 14px; line-height: 1.4; }
+.alerts-expired { flex: none; font-size: 14px; font-weight: 500; line-height: 1.4; color: #B3261E; white-space: nowrap; } /* 標題 · 已過期（文字，不用膠囊） */
 .alerts-actions { display: flex; justify-content: flex-end; padding-top: 6px; }
 .alerts { animation: fadeIn 0.28s ease backwards; transition: opacity 0.24s ease, transform 0.24s ease; }
 .alerts.closing { opacity: 0; transform: translateY(-6px); pointer-events: none; }

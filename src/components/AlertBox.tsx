@@ -64,7 +64,12 @@ export function AlertBox({ alerts, closing, onAck, onMoveAll, onMute, onComplete
                     <DateCell iso={t.date} />
                     <span className="alerts-main">
                       <span className="alerts-title">{t.title}</span>
-                      {expired && <span className="alerts-expired">已過期</span>}
+                      {expired && (
+                        <>
+                          <span className="alerts-sep">·</span>
+                          <span className="alerts-expired">已過期</span>
+                        </>
+                      )}
                     </span>
                     <button type="button" className="alerts-cap" tabIndex={tab} onClick={() => onComplete(t)}>已完成</button>
                   </li>

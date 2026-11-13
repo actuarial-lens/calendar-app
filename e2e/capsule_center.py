@@ -60,7 +60,6 @@ async def main():
                 results.append((label, txt, round(float(off), 2), round(box['height'], 1), pad))
         S = page.locator
         await measure('提示框 已確認/不再通知/已完成/全部移至本日', S('.alerts-cap'))
-        await measure('提示框 已過期', S('.alerts-expired'), 1.5)
         await measure('分類頁籤', S('.tag'))
         await measure('週列日期', S('.week .day'), 4)
         await hide.evaluate('e=>e.remove()')
