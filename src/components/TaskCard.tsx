@@ -40,6 +40,7 @@ export function TaskCard({ task, phase, open, anyOpen, actions, startActions, op
             <div className="left">
               <span className="cat">{task.category}</span>
               {task.important && <span className="imp">重要</span>}
+              {task.deadline && <span className="dl">截止</span>}
               {task.repeat && <span className="rep">↻ {REPEAT_LABEL[task.repeat.freq]}</span>}
               {!task.done && task.delayDays > 0 && <span className="delay">延 {task.delayDays} 天</span>}
             </div>

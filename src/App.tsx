@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertBox } from './components/AlertBox';
 import { Banner } from './components/Banner';
+import { ConfirmSheet } from './components/ConfirmSheet';
 import { CalendarSheet } from './components/CalendarSheet';
 import { EditSheet } from './components/EditSheet';
 import { RepeatDeleteSheet } from './components/RepeatDeleteSheet';
@@ -25,6 +27,7 @@ import { reorderTask, timeGroup } from './lib/reorder';
 import { useTaskDrag } from './lib/useTaskDrag';
 import type { Action, Changes } from './lib/changes';
 import { useAnimatedList } from './lib/animatedList';
+import { alertsEmpty, buildAlerts, moveAllToToday, muteOverdue } from './lib/alerts';
 import { addDays, rangeText, weekDates } from './lib/dates';
 import { formFromTask, newForm, type EditorForm } from './lib/editor';
 import { newId } from './lib/id';
@@ -41,6 +44,7 @@ const BLUE = '#2E4A6B';
 const GREY = '#6F6A60';
 const RED = '#A4554B';
 const TOAST_MS = 4000;
+const ALERTS_ACK = 'alertsAck';
 
 interface AppProps {
   initialMissed?: Reminder[];
@@ -51,6 +55,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const tasks = useLive(() => db.tasks.toArray());
   const notes = useLive(() => db.notes.toArray());
   const settings = useLive(() => loadSettings(db));
+  const alertsAck = useLive(() => db.kv.get(ALERTS_ACK).then((r) => (typeof r?.value === 'string' ? r.value : ''))); // 提示框「已確認」的日期
   const today = useToday();
   const [day, setDay] = useState(initialDay ?? today);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -61,6 +66,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
   const [form, setForm] = useState<EditorForm | null>(null);
   const [calOpen, setCalOpen] = useState(false);
   const [delAsk, setDelAsk] = useState<Task | null>(null); // 要刪除的是重複事項，等著問「這一次還是全部」
+  const [moveAsk, setMoveAsk] = useState<Task[] | null>(null); // 「全部移至本日」的確認視窗
   const [toast, setToast] = useState<{ text: string; undo: Changes } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -120,6 +126,11 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
     const a = t && tasks ? reorderTask(tasks, t, prevId, nextId, Date.now()) : null;
     if (a) void run(a);
   });
+
+  const alerts = useMemo(() => buildAlerts(tasks ?? [], today), [tasks, today]);
+  const showAlerts = alertsAck !== undefined && alertsAck !== today && !alertsEmpty(alerts);
+  const alertsP = usePresence(showAlerts ? alerts : null, 240);
+  const moveP = usePresence(moveAsk, 300);
 
   const marks = useMemo(() => {
     const s = new Set<string>();
@@ -242,6 +253,16 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
       </header>
 
       {missedP.shown && <MissedBlock items={missedP.shown} closing={missedP.closing} today={today} onClose={() => setMissed([])} />}
+      {alertsP.shown && (
+        <AlertBox
+          alerts={alertsP.shown}
+          closing={alertsP.closing}
+          onAck={() => void db.kv.put({ key: ALERTS_ACK, value: today })}
+          onMoveAll={() => setMoveAsk(alerts.overdue)}
+          onMute={() => void run(muteOverdue(alerts.overdue, Date.now()))}
+          onComplete={(t) => void run(A.completeTask(t, Date.now()))}
+        />
+      )}
       <WeekStrip day={day} marks={marks} onPick={pickDay} onShiftWeek={(dir) => pickDay(addDays(day, dir * 7))} />
       <TagBar tag={tag} onPick={(t) => { setTag(t); setOpenId(null); }} />
 
@@ -327,6 +348,22 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
             const t = delP.shown!;
             setDelAsk(null);
             void run(deleteSeries(tasks, t, Date.now()));
+          }}
+        />
+      )}
+
+      {moveP.shown && (
+        <ConfirmSheet
+          heading="全部移至本日"
+          text={`要把 ${moveP.shown.length} 件過去的重要事項移到今天嗎？`}
+          confirmLabel={`移到今天（${moveP.shown.length} 件）`}
+          hint="時間不變。移過來的可以向右滑「恢復」回到原本的日期。"
+          closing={moveP.closing}
+          onCancel={() => setMoveAsk(null)}
+          onConfirm={() => {
+            const list = moveP.shown!;
+            setMoveAsk(null);
+            void run(moveAllToToday(list, today, Date.now()));
           }}
         />
       )}

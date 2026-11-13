@@ -13,6 +13,7 @@ export interface Repeat {
   occurrence: string; // 這一筆原本屬於哪一天（被延後、改日期都不會變）
   until?: string; // 結束日期（含當天）；沒有就是不結束
   important?: boolean; // 這組之後新排出來的每一筆要不要標「重要」（「未來每一次」時設定）
+  deadline?: boolean; // 同上，標「截止日」
   /** 之後新排出來的每一筆用的標題、時間、分類、提前提醒；舊資料沒有時看原定日期最晚的那一筆 */
   tpl?: SeriesTpl;
 }
@@ -36,6 +37,8 @@ export interface Task {
   leadMinutes?: number; // 這一件事自己的提前提醒分鐘；沒有就用設定裡的預設
   order?: number; // 長按拖動排過的順序（同一天、同一時段內比較）；沒有就照時間
   important?: boolean; // 高度重要：卡片上分類右邊顯示紅字「重要」
+  deadline?: boolean; // 這一筆的日期是截止日：卡片顯示「截止」，7 天內會列在提示框
+  muteOverdue?: boolean; // 提示框「過去重要未結」按了「不再通知」：以後不再列
   delayDays: number; // 累計延後天數，> 0 時顯示「延 N 天」
   createdAt: number;
   updatedAt: number;

@@ -47,6 +47,8 @@ function validTask(t: unknown): t is Task {
     isStr(o.title) && isStr(o.note) && typeof o.done === 'boolean' &&
     isNum(o.delayDays) && isNum(o.createdAt) && isNum(o.updatedAt) &&
     (o.important === undefined || typeof o.important === 'boolean') &&
+    (o.deadline === undefined || typeof o.deadline === 'boolean') &&
+    (o.muteOverdue === undefined || typeof o.muteOverdue === 'boolean') &&
     (o.order === undefined || isNum(o.order)) &&
     (o.repeat === undefined || (!!o.repeat && typeof o.repeat === 'object' && validTpl((o.repeat as Record<string, unknown>).tpl)))
   );

@@ -9,6 +9,9 @@
   --delay-fg: #8A4B3F;
   --delay-bd: #D9B8B0;
   --done-title: #6B7077;
+  --amber: #9A5800; /* 深琥珀：重要未結／截止提示 */
+  --amber-bd: #E2C394;
+  --amber-bg: #FBF4E8;
   --font: 'Noto Sans TC', 'PingFang TC', system-ui, -apple-system, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
@@ -125,6 +128,7 @@ input::placeholder { color: #7A7F86; }
 .card .left { display: flex; gap: 8px; align-items: center; }
 .card .cat { font-size: 12px; color: var(--blue); font-weight: 500; letter-spacing: 0.12em; }
 .card .imp { font-size: 12px; color: #B3261E; font-weight: 500; letter-spacing: 0.12em; }
+.card .dl { font-size: 12px; color: var(--amber); font-weight: 500; letter-spacing: 0.12em; }
 .card .delay {
   font-size: 11px; color: var(--delay-fg);
   border: 1px solid var(--delay-bd); border-radius: 999px; padding: 1px 7px;
@@ -309,6 +313,37 @@ input::placeholder { color: #7A7F86; }
 .missed li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 6px 0; border-top: 1px dashed var(--line); }
 .missed-title { font-size: 14px; font-weight: 500; }
 .missed-body, .missed-date { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+
+/* 重要未結＋截止提示框 */
+.alerts {
+  flex: none;
+  margin: 0 20px 12px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-bd);
+  border-radius: 16px;
+  padding: 6px 8px 6px 16px;
+}
+.alerts-head { display: flex; align-items: center; gap: 4px; }
+.alerts-sum {
+  flex: 1; min-height: 36px; padding: 0; border: none; background: none; text-align: left;
+  color: var(--amber); font-size: 13px; font-weight: 700; line-height: 1.5;
+}
+.alerts-sum::after { content: ' ▾'; font-weight: 400; }
+.alerts-sum[aria-expanded='true']::after { content: ' ▴'; }
+.alerts-ack, .alerts-done, .alerts-btn {
+  flex: none; height: 32px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--amber-bd); background: var(--card); color: var(--amber); font-size: 13px;
+}
+.alerts-sec { padding: 4px 8px 6px 0; }
+.alerts-sec h3 { margin: 6px 0 2px; font-size: 12px; font-weight: 500; color: var(--text-2); letter-spacing: 0.08em; }
+.alerts ul { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; }
+.alerts li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--amber-bd); }
+.alerts-date { flex: none; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.alerts-expired { flex: none; font-size: 11px; color: var(--card); background: var(--amber); border-radius: 999px; padding: 1px 7px; }
+.alerts-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alerts-actions { display: flex; gap: 8px; padding-top: 6px; }
+.alerts { animation: fadeIn 0.28s ease backwards; transition: opacity 0.24s ease, transform 0.24s ease; }
+.alerts.closing { opacity: 0; transform: translateY(-6px); pointer-events: none; }
 
 /* App 內提醒 */
 .banner {

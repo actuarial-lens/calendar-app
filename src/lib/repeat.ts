@@ -77,6 +77,7 @@ export function planRepeats(tasks: Task[], today: string, now: number, newId: ()
         ...(tpl.leadMinutes !== undefined ? { leadMinutes: tpl.leadMinutes } : {}),
         // 「重要」看整組的設定，不看範本那一筆（範本可能是「僅限這次」改過的）
         ...(r.important ? { important: true } : {}),
+        ...(r.deadline ? { deadline: true } : {}),
         done: false,
         delayDays: 0,
         createdAt: now + added.length, // 保持固定順序
@@ -172,10 +173,16 @@ export function repeatHint(freq: RepeatFreq, date: string): string {
   return day > 28 ? `每月 ${day} 日重複，沒有那天的月份改在月底` : `每月 ${day} 日重複`;
 }
 
-/** 依 important 設定或拿掉欄位（false 時不留欄位） */
+export type Flag = 'important' | 'deadline';
+
+/** 設定或拿掉 important／deadline（false 時不留欄位） */
+export function setFlag<T extends { important?: boolean; deadline?: boolean }>(x: T, key: Flag, on: boolean): T {
+  const { [key]: _f, ...rest } = x;
+  return (on ? { ...rest, [key]: true } : rest) as T;
+}
+
 export function setImportant<T extends { important?: boolean }>(x: T, important: boolean): T {
-  const { important: _i, ...rest } = x;
-  return (important ? { ...rest, important: true } : rest) as T;
+  return setFlag(x, 'important', important);
 }
 
 /** 一筆事項的標題、時間、分類、提前提醒 → 整組的範本 */
@@ -238,9 +245,9 @@ export function applyPatch<T extends Task | SeriesTpl>(x: T, p: TplPatch): T {
 /**
  * 「未來每一次」：同一組裡原定日期在 t 之後的每一筆，整組設定都改掉（之後新排的會跟著），
  * 其中還沒完成、沒被刪掉的那些，卡片內容也一起改。t 自己不在回傳裡。
- * important：要改「重要」時給；patch + tpl：要改標題／時間／分類／提前提醒時給（tpl 是改完的整組範本）。
+ * important／deadline：要改「重要」「截止日」時給；patch + tpl：要改標題／時間／分類／提前提醒時給（tpl 是改完的整組範本）。
  */
-export function editFuture(all: Task[], t: Task, opts: { important?: boolean; patch?: TplPatch; tpl?: SeriesTpl }, now: number): Task[] {
+export function editFuture(all: Task[], t: Task, opts: { important?: boolean; deadline?: boolean; patch?: TplPatch; tpl?: SeriesTpl }, now: number): Task[] {
   const r = t.repeat!;
   const out: Task[] = [];
   for (const x of all) {
@@ -248,9 +255,11 @@ export function editFuture(all: Task[], t: Task, opts: { important?: boolean; pa
     const live = !x.done && !x.deletedAt;
     let next: Task = x;
     let rep: Repeat = x.repeat;
-    if (opts.important !== undefined) {
-      if (live) next = setImportant(next, opts.important);
-      rep = setImportant(rep, opts.important);
+    for (const key of ['important', 'deadline'] as const) {
+      const on = opts[key];
+      if (on === undefined) continue;
+      if (live) next = setFlag(next, key, on);
+      rep = setFlag(rep, key, on);
     }
     if (opts.patch && opts.tpl) {
       if (live) next = applyPatch(next, opts.patch);

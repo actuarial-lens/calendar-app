@@ -5,7 +5,7 @@ import type { EditorForm } from './editor';
 import { formTime } from './editor';
 import type { Note, Task } from '../types';
 import { dropOrder } from './reorder';
-import { applyPatch, currentTpl, editFuture, endSeries, isEmptyPatch, repeatChanged, repeatFromForm, setImportant, tplOf, tplPatch } from './repeat';
+import { applyPatch, currentTpl, editFuture, endSeries, isEmptyPatch, repeatChanged, repeatFromForm, setFlag, setImportant, tplOf, tplPatch } from './repeat';
 
 const withTask = (t: Task): Action['changes'] => ({ ...emptyChanges(), putTasks: [t] });
 const withNote = (n: Note): Action['changes'] => ({ ...emptyChanges(), putNotes: [n] });
@@ -100,9 +100,10 @@ export function saveForm(
       updatedAt: now,
       ...(form.lead !== null ? { leadMinutes: form.lead } : {}),
       ...(form.important ? { important: true } : {}),
-      // 新的重複事項：整組都跟著這一筆的「重要」
+      ...(form.deadline ? { deadline: true } : {}),
     };
-    if (form.repeat !== 'none') task.repeat = { ...setImportant(repeatFromForm(form, newSeriesId)!, form.important), tpl: tplOf(task) };
+    // 新的重複事項：整組都跟著這一筆的「重要」「截止日」與內容
+    if (form.repeat !== 'none') task.repeat = { ...setFlag(setFlag(repeatFromForm(form, newSeriesId)!, 'important', form.important), 'deadline', form.deadline), tpl: tplOf(task) };
     return { changes: withTask(task), message: '已新增到 ' + dayLabel(form.date) };
   }
   const moved = existing.date !== form.date;
@@ -111,10 +112,11 @@ export function saveForm(
   // 時間改了也拿掉：讓它照新的時間重新插入
   const regrouped = moved || existing.time !== time;
   const { leadMinutes: _lead, ...existingRest } = regrouped ? dropOrder(existing) : existing;
-  let base: Task = setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important);
+  let base: Task = setFlag(setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important), 'deadline', form.deadline);
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
   // 重複事項選了「未來每一次」：整組設定跟著改；「僅限這次」只改這一筆，整組設定不動
   const future = !!existing.repeat && form.importantScope === 'future';
+  const futureDl = !!existing.repeat && form.deadlineScope === 'future';
   if (!repeatChanged(existing, form)) {
     if (!existing.repeat) return { changes: withTask(base), message };
     const patch = tplPatch(existing, form);
@@ -124,9 +126,11 @@ export function saveForm(
     const tpl = editFut ? applyPatch(oldTpl, patch) : oldTpl;
     let rep = { ...existing.repeat, tpl };
     if (future) rep = setImportant(rep, form.important);
+    if (futureDl) rep = setFlag(rep, 'deadline', form.deadline);
     base = { ...base, repeat: rep };
-    if (!future && !editFut) return { changes: withTask(base), message };
-    const others = editFuture(all, existing, { ...(future ? { important: form.important } : {}), ...(editFut ? { patch, tpl } : {}) }, now);
+    if (!future && !futureDl && !editFut) return { changes: withTask(base), message };
+    const opts = { ...(future ? { important: form.important } : {}), ...(futureDl ? { deadline: form.deadline } : {}), ...(editFut ? { patch, tpl } : {}) };
+    const others = editFuture(all, existing, opts, now);
     return { changes: { ...emptyChanges(), putTasks: [base, ...others] }, message: editFut && !moved ? '已更新未來每一次' : message };
   }
 
@@ -135,7 +139,8 @@ export function saveForm(
   const fresh = repeatFromForm(form, newSeriesId, existing);
   // 新開的一組：原本是重複且選「僅限這次」就沿用舊組的設定，否則跟著這一筆
   const seriesImportant = existing.repeat && !future ? !!existing.repeat.important : form.important;
-  const rep = fresh && { ...setImportant(fresh, seriesImportant), tpl: tplOf(plain) };
+  const seriesDeadline = existing.repeat && !futureDl ? !!existing.repeat.deadline : form.deadline;
+  const rep = fresh && { ...setFlag(setImportant(fresh, seriesImportant), 'deadline', seriesDeadline), tpl: tplOf(plain) };
   const putTasks: Task[] = [rep ? { ...plain, repeat: rep } : plain];
   if (existing.repeat) putTasks.push(...endSeries(all, existing, now, existing.repeat.occurrence));
   return { changes: { ...emptyChanges(), putTasks }, message };

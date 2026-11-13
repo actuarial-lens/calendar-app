@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { quickDates, type EditorForm, type TimeMode } from '../lib/editor';
 import { CATEGORIES, LEAD_OPTIONS, type Category } from '../types';
-import { repeatHint, repeatStart, type RepeatOrigin } from '../lib/repeat';
+import { repeatHint, repeatStart, type Flag, type RepeatOrigin } from '../lib/repeat';
 import { usePresence } from '../lib/usePresence';
 import { CalendarSheet } from './CalendarSheet';
 import { TimeWheel } from './TimeWheel';
@@ -32,8 +32,10 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
   const [leadNotice, setLeadNotice] = useState(false); // 剛改成獨立通知時間時跳出的說明框
   const [picking, setPicking] = useState<'date' | 'until' | null>(null); // 正在用月曆選哪一個日期
   const pickP = usePresence(picking, 300);
-  const [askImp, setAskImp] = useState(false); // 重複事項切換「重要」時的詢問框
-  const askP = usePresence(askImp ? !form.important : null, 300); // 記住要切成什麼，關閉動畫時文字不變
+  const [askFlag, setAskFlag] = useState<Flag | null>(null); // 重複事項切換「重要」「截止日」時的詢問框
+  // 記住要切哪一個、切成什麼，關閉動畫時文字不變
+  const askP = usePresence(askFlag ? { key: askFlag, on: !form[askFlag] } : null, 300);
+  const askImp = askFlag !== null;
   const [askEdit, setAskEdit] = useState(false); // 重複事項改了內容，按「儲存」時的詢問框
   const editP = usePresence(askEdit ? true : null, 300);
   const canSave = form.title.trim().length > 0;
@@ -146,17 +148,26 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
         </div>
 
         <div className="field" role="group" aria-labelledby="ed-imp-l">
-          <span id="ed-imp-l" className="field-label">重要性</span>
+          <span id="ed-imp-l" className="field-label">標記</span>
           <div className="chips">
             <button
               type="button"
               className="chip"
               aria-pressed={form.important}
-              onClick={() => (seriesFreq ? setAskImp(true) : onChange({ important: !form.important }))}
+              onClick={() => (seriesFreq ? setAskFlag('important') : onChange({ important: !form.important }))}
             >
               高度重要性
             </button>
+            <button
+              type="button"
+              className="chip"
+              aria-pressed={form.deadline}
+              onClick={() => (seriesFreq ? setAskFlag('deadline') : onChange({ deadline: !form.deadline }))}
+            >
+              截止日
+            </button>
           </div>
+          {form.deadline && <p className="field-hint">日期就是截止日；7 天內會列在上方的提示框。</p>}
         </div>
 
         <div className="field" role="group" aria-labelledby="ed-rep-l">
@@ -229,19 +240,21 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
     )}
     {askP.shown !== null && seriesFreq && (
       <ScopeSheet
-        heading={askP.shown ? '設為重要' : '取消重要'}
+        heading={(askP.shown.on ? '設為' : '取消') + (askP.shown.key === 'important' ? '重要' : '截止日')}
         title={form.title.trim() || '這件事'}
         freq={seriesFreq}
         hint="「未來每一次」會改這一筆和之後還沒完成的每一筆。按「儲存」後才會生效。"
         closing={askP.closing}
-        onCancel={() => setAskImp(false)}
+        onCancel={() => setAskFlag(null)}
         onOne={() => {
-          onChange({ important: !form.important, importantScope: 'one' });
-          setAskImp(false);
+          const k = askP.shown!.key;
+          onChange(k === 'important' ? { important: !form.important, importantScope: 'one' } : { deadline: !form.deadline, deadlineScope: 'one' });
+          setAskFlag(null);
         }}
         onFuture={() => {
-          onChange({ important: !form.important, importantScope: 'future' });
-          setAskImp(false);
+          const k = askP.shown!.key;
+          onChange(k === 'important' ? { important: !form.important, importantScope: 'future' } : { deadline: !form.deadline, deadlineScope: 'future' });
+          setAskFlag(null);
         }}
       />
     )}
