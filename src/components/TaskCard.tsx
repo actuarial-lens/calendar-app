@@ -39,10 +39,11 @@ export function TaskCard({ task, phase, open, anyOpen, actions, startActions, op
           <div className="row1">
             <div className="left">
               <span className="cat">{task.category}</span>
-              {task.important && <span className="imp">重要</span>}
-              {task.deadline && <span className="dl">截止</span>}
+              {/* 膠囊的順序：重要（紅）→ 截止（藍）→ 延 N 天；重複標記是純文字，放最後 */}
+              {task.important && <span className="pill imp">重要</span>}
+              {task.deadline && <span className="pill dl">截止</span>}
+              {!task.done && task.delayDays > 0 && <span className="pill delay">延 {task.delayDays} 天</span>}
               {task.repeat && <span className="rep">↻ {REPEAT_LABEL[task.repeat.freq]}</span>}
-              {!task.done && task.delayDays > 0 && <span className="delay">延 {task.delayDays} 天</span>}
             </div>
             <span className="time">{task.time}</span>
           </div>
