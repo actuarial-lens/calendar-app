@@ -1,6 +1,6 @@
 import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
-import { isISODate, notificationTarget, parsePushMessage } from './lib/swLogic';
+import { isISODate, notificationTarget, parsePushMessage, recordFired } from './lib/swLogic';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<string | { url: string; revision: string | null }> };
 
@@ -13,12 +13,15 @@ precacheAndRoute(self.__WB_MANIFEST);
 self.addEventListener('push', (event) => {
   const msg = parsePushMessage(event.data ? event.data.text() : null);
   event.waitUntil(
-    self.registration.showNotification(msg.title, {
-      body: msg.body,
-      tag: msg.tag,
-      data: { date: msg.date },
-      icon: new URL('icons/icon-192.png', self.registration.scope).href,
-    }),
+    Promise.all([
+      self.registration.showNotification(msg.title, {
+        body: msg.body,
+        tag: msg.tag,
+        data: { date: msg.date },
+        icon: new URL('icons/icon-192.png', self.registration.scope).href,
+      }),
+      recordFired(indexedDB, msg.id, Date.now()), // 打開 App 時不再列為「錯過」
+    ]),
   );
 });
 

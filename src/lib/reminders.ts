@@ -38,6 +38,36 @@ export function leadReminderAt(task: Pick<Task, 'date' | 'time'>, leadMinutes: n
   return t === null ? null : t - leadMinutes * MINUTE;
 }
 
+function leadReminder(t: Task, settings: Settings): Reminder | null {
+  const lead = t.leadMinutes ?? settings.leadMinutes;
+  const at = leadReminderAt(t, lead);
+  if (at === null) return null;
+  return {
+    id: `lead:${t.id}:${t.date}:${t.time}:${lead}`,
+    kind: 'lead',
+    at,
+    date: t.date,
+    taskId: t.id,
+    title: t.title,
+    body: `${dayLabel(t.date)} ${t.time}`,
+  };
+}
+
+/**
+ * 「來不及」的提前提醒：該響的時間在 from 之前就過了（例如距離開始不到提前分鐘才新增、或改了時間／提前分鐘），
+ * 但事項還沒開始。這些要馬上提醒一次，所以 at 改成 now。
+ */
+export function lateLeadReminders(tasks: Task[], settings: Settings, from: number, now: number): Reminder[] {
+  const out: Reminder[] = [];
+  for (const t of tasks) {
+    if (t.deletedAt || t.done) continue;
+    const r = leadReminder(t, settings);
+    const start = atLocal(t.date, t.time);
+    if (r && start !== null && r.at <= from && start > now) out.push({ ...r, at: now });
+  }
+  return out;
+}
+
 const PREVIEW_COUNT = 3;
 
 function morningReminder(date: string, day: Task[], settings: Settings, at: number): Reminder {
@@ -63,18 +93,8 @@ export function buildReminders(tasks: Task[], settings: Settings, from: number, 
   const open = tasks.filter((t) => !t.deletedAt && !t.done);
 
   for (const t of open) {
-    const lead = t.leadMinutes ?? settings.leadMinutes;
-    const at = leadReminderAt(t, lead);
-    if (at === null || at <= from || at > to) continue;
-    out.push({
-      id: `lead:${t.id}:${t.date}:${t.time}:${lead}`,
-      kind: 'lead',
-      at,
-      date: t.date,
-      taskId: t.id,
-      title: t.title,
-      body: `${dayLabel(t.date)} ${t.time}`,
-    });
+    const r = leadReminder(t, settings);
+    if (r && r.at > from && r.at <= to) out.push(r);
   }
 
   const last = toISO(new Date(to));

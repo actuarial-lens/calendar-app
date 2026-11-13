@@ -73,11 +73,11 @@ describe('換日期或時段就不再沿用順序', () => {
     expect(delayTask(t, 5).changes.putTasks[0].order).toBeUndefined();
     expect(undelayTask({ ...t, delayDays: 1 }, 5).changes.putTasks[0].order).toBeUndefined();
   });
-  it('編輯：改時段或日期就拿掉，同時段改時間或改標題保留', () => {
+  it('編輯：改時間或日期就拿掉，只改標題保留', () => {
     const f = formFromTask(t);
     expect(saveForm({ ...f, timeMode: '下午' }, t, 5, 'z')!.changes.putTasks[0].order).toBeUndefined();
     expect(saveForm({ ...f, date: '2026-11-14' }, t, 5, 'z')!.changes.putTasks[0].order).toBeUndefined();
-    expect(saveForm({ ...f, timeVal: '10:30' }, t, 5, 'z')!.changes.putTasks[0].order).toBe(3);
+    expect(saveForm({ ...f, timeVal: '10:30' }, t, 5, 'z')!.changes.putTasks[0].order).toBeUndefined(); // 改時間就照時間重排
     expect(saveForm({ ...f, title: '新' }, t, 5, 'z')!.changes.putTasks[0].order).toBe(3);
   });
 });

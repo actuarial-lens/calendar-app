@@ -4,7 +4,7 @@ import { isISODate, notificationTarget, parsePushMessage } from './swLogic';
 describe('parsePushMessage', () => {
   it('正常內容', () => {
     expect(parsePushMessage(JSON.stringify({ title: '對稿', body: '11/10（二） 14:00', date: '2026-11-10', id: 'lead:a' }))).toEqual({
-      title: '對稿', body: '11/10（二） 14:00', date: '2026-11-10', tag: 'lead:a',
+      title: '對稿', body: '11/10（二） 14:00', date: '2026-11-10', tag: 'lead:a', id: 'lead:a',
     });
   });
   it('沒有內容或格式不對也不出錯', () => {

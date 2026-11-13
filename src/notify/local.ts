@@ -1,4 +1,4 @@
-import { LIVE_WINDOW_MS, buildReminders, splitDue, type Reminder } from '../lib/reminders';
+import { LIVE_WINDOW_MS, buildReminders, lateLeadReminders, splitDue, type Reminder } from '../lib/reminders';
 import type { NotificationProvider, SyncContext } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -25,7 +25,8 @@ export async function drainDue(
   const { tasks, settings, now } = ctx;
   const lastSeen = (await store.getLastSeen()) ?? now; // 第一次使用：從現在開始算
   const from = Math.max(lastSeen, now - MAX_LOOKBACK);
-  const candidates = buildReminders(tasks, settings, from, now);
+  // 還要加上來不及的提前提醒（事項還沒開始就馬上提醒一次）；發過的會被下面的紀錄擋掉
+  const candidates = [...buildReminders(tasks, settings, from, now), ...lateLeadReminders(tasks, settings, from, now)];
   const fired = await store.firedIds(candidates.map((r) => r.id));
   const due = candidates.filter((r) => !fired.has(r.id));
   const split = splitDue(due, now, allMissed ? -1 : LIVE_WINDOW_MS);

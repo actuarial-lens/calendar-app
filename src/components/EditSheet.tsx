@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { quickDates, type EditorForm, type TimeMode } from '../lib/editor';
 import { CATEGORIES, LEAD_OPTIONS, type Category } from '../types';
-import { repeatHint } from '../lib/repeat';
+import { repeatHint, repeatStart, type RepeatOrigin } from '../lib/repeat';
 import { usePresence } from '../lib/usePresence';
 import { CalendarSheet } from './CalendarSheet';
 import { TimeWheel } from './TimeWheel';
@@ -14,7 +14,8 @@ interface Props {
   closing: boolean;
   today: string;
   defaultLead: number; // 設定裡的預設提前分鐘
-  seriesFreq: RepeatFreq | null; // 編輯的是已存在的重複事項時，它的頻率（切換「重要」要先問範圍）
+  seriesFreq: RepeatFreq | null;
+  origin: RepeatOrigin; // 編輯中的事項原本的日期與重複設定（提示文字用同一個起始日） // 編輯的是已存在的重複事項時，它的頻率（切換「重要」要先問範圍）
   onChange: (patch: Partial<EditorForm>) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -22,7 +23,7 @@ interface Props {
 
 const TIME_CHIPS: [TimeMode, string][] = [['', '不設'], ['上午', '上午'], ['下午', '下午'], ['pick', '指定']];
 
-export function EditSheet({ form, closing, today, defaultLead, seriesFreq, onChange, onCancel, onSave }: Props) {
+export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origin, onChange, onCancel, onSave }: Props) {
   const quick = quickDates(today);
   const isQuick = quick.includes(form.date);
   const [shake, setShake] = useState(false);
@@ -179,7 +180,7 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, onCha
                 </button>
               </div>
               <p className="field-hint">
-                {repeatHint(form.repeat, form.date)}
+                {repeatHint(form.repeat, repeatStart(origin, form).anchor)}
                 {form.until ? `，到 ${form.until.replace(/-/g, '.')} 為止` : ''}
               </p>
             </>

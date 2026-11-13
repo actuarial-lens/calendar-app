@@ -100,21 +100,34 @@ export function withRepeats(a: Action, tasks: Task[], today: string, now: number
   return { ...a, changes: { ...a.changes, putTasks: [...a.changes.putTasks, ...added] } };
 }
 
-/** 表單目前的重複設定 → Repeat（不重複時回傳 undefined） */
-export function repeatFromForm(form: Pick<EditorForm, 'repeat' | 'until' | 'date'>, seriesId: string): Repeat | undefined {
-  if (form.repeat === 'none') return undefined;
-  const until = form.until && form.until >= form.date ? form.until : undefined;
-  return { seriesId, freq: form.repeat, anchor: form.date, occurrence: form.date, ...(until ? { until } : {}) };
+/** 編輯中的事項原本的樣子（新增時為 null）：用來決定重複的起始日 */
+export type RepeatOrigin = Pick<Task, 'date' | 'repeat'> | null;
+
+/**
+ * 重複的起始日：沒在面板改日期時沿用原本的（被延後、或月底順延的那一筆，不會讓整組的日子跑掉）；
+ * 換了頻率就以這一筆原定的日期為準；改了日期或原本不重複，就用表單上的日期。
+ */
+export function repeatStart(origin: RepeatOrigin, form: Pick<EditorForm, 'repeat' | 'date'>): { anchor: string; occurrence: string } {
+  const r = origin?.repeat;
+  if (!r || origin!.date !== form.date) return { anchor: form.date, occurrence: form.date };
+  return { anchor: r.freq === form.repeat ? r.anchor : r.occurrence, occurrence: r.occurrence };
 }
 
-/** 這組重複在編輯面板上有沒有被改動 */
+/** 表單目前的重複設定 → Repeat（不重複時回傳 undefined） */
+export function repeatFromForm(form: Pick<EditorForm, 'repeat' | 'until' | 'date'>, seriesId: string, origin: RepeatOrigin = null): Repeat | undefined {
+  if (form.repeat === 'none') return undefined;
+  const start = repeatStart(origin, form);
+  const until = form.until && form.until >= start.occurrence ? form.until : undefined;
+  return { seriesId, freq: form.repeat, ...start, ...(until ? { until } : {}) };
+}
+
+/** 這組重複在編輯面板上有沒有被改動（直接比原本的結束日，不依日期修正，已結束的才不會被當成改過） */
 export function repeatChanged(existing: Task, form: Pick<EditorForm, 'repeat' | 'until' | 'date'>): boolean {
   const old = existing.repeat;
   const oldFreq = old ? old.freq : 'none';
   if (oldFreq !== form.repeat) return true;
   if (!old) return false;
-  const newUntil = form.until && form.until >= form.date ? form.until : '';
-  return (old.until ?? '') !== newUntil;
+  return (old.until ?? '') !== form.until;
 }
 
 /**

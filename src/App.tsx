@@ -338,6 +338,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           today={today}
           defaultLead={settings.leadMinutes}
           seriesFreq={(formP.shown.id && tasks.find((t) => t.id === formP.shown!.id)?.repeat?.freq) || null}
+          origin={(formP.shown.id && tasks.find((t) => t.id === formP.shown!.id)) || null}
           onChange={(patch) => setForm((f) => (f ? { ...f, ...patch } : f))}
           onCancel={() => setForm(null)}
           onSave={save}

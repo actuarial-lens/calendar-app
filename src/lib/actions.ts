@@ -4,7 +4,7 @@ import { addDays, dayLabel } from './dates';
 import type { EditorForm } from './editor';
 import { formTime } from './editor';
 import type { Note, Task } from '../types';
-import { dropOrder, timeGroup } from './reorder';
+import { dropOrder } from './reorder';
 import { endSeries, importantForFuture, repeatChanged, repeatFromForm, setImportant } from './repeat';
 
 const withTask = (t: Task): Action['changes'] => ({ ...emptyChanges(), putTasks: [t] });
@@ -108,7 +108,8 @@ export function saveForm(
   const moved = existing.date !== form.date;
   // 自己改了日期就當作重新安排，不再算「延後」
   // 換了日期或時段，手動排的順序不再適用
-  const regrouped = moved || timeGroup(existing.time) !== timeGroup(time);
+  // 時間改了也拿掉：讓它照新的時間重新插入
+  const regrouped = moved || existing.time !== time;
   const { leadMinutes: _lead, ...existingRest } = regrouped ? dropOrder(existing) : existing;
   let base: Task = setImportant({ ...existingRest, ...(form.lead !== null ? { leadMinutes: form.lead } : {}), title, date: form.date, time, category: form.category, updatedAt: now, ...(moved ? { delayDays: 0 } : {}) }, form.important);
   const message = moved ? '已移到 ' + dayLabel(form.date) : '已更新';
@@ -122,7 +123,7 @@ export function saveForm(
 
   // 重複設定改了：這一筆另開一組新的（或變成不重複），舊的那組在這一筆之前結束、之後還沒做的拿掉
   const { repeat: _old, ...plain } = base;
-  const fresh = repeatFromForm(form, newSeriesId);
+  const fresh = repeatFromForm(form, newSeriesId, existing);
   // 新開的一組：原本是重複且選「僅限這次」就沿用舊組的設定，否則跟著這一筆
   const seriesImportant = existing.repeat && !future ? !!existing.repeat.important : form.important;
   const rep = fresh && setImportant(fresh, seriesImportant);

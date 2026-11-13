@@ -78,15 +78,21 @@ export interface PushDeps {
 export class PushProvider implements NotificationProvider {
   readonly name = 'push' as const;
   private lastSent = '';
+  /** 上次成功送出排程時用的設定；推播欄位被清空時，用它請伺服器停止推送 */
+  private sentWith: Settings | null = null;
 
   constructor(private deps: PushDeps) {}
 
+  /** 設定好了，或剛被清空、還要通知伺服器取消 */
   isConfigured(settings: Settings): boolean {
-    return isPushConfigured(settings);
+    return isPushConfigured(settings) || this.sentWith !== null;
   }
 
   async sync(ctx: SyncContext, reason: SyncReason): Promise<void> {
-    if (!this.isConfigured(ctx.settings)) return;
+    if (!isPushConfigured(ctx.settings)) {
+      if (this.sentWith) await this.unsubscribe(this.sentWith);
+      return;
+    }
     if (reason === 'tick') return; // 資料沒變就不用重送
     if (this.deps.permission() !== 'granted') return;
     const registration = await this.deps.getRegistration();
@@ -105,6 +111,21 @@ export class PushProvider implements NotificationProvider {
     });
     if (!res.ok) throw new Error(`推播伺服器回應 ${res.status}`);
     this.lastSent = fingerprint;
+    this.sentWith = ctx.settings;
+  }
+
+  /** 請伺服器刪掉這支手機的排程（不管成功與否都只試一次，之後重新填好會再送） */
+  private async unsubscribe(settings: Settings): Promise<void> {
+    this.sentWith = null;
+    this.lastSent = '';
+    const registration = await this.deps.getRegistration();
+    const subscription = await registration?.pushManager.getSubscription();
+    if (!subscription) return;
+    await this.deps.fetch(serverUrl(settings, '/unsubscribe'), {
+      method: 'POST',
+      headers: authHeaders(settings),
+      body: JSON.stringify({ subscription: subscription.toJSON() }),
+    });
   }
 }
 
