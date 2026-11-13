@@ -20,7 +20,7 @@ import { addNote, ensureRepeats } from './db/maintenance';
 import { loadSettings, saveSettings } from './db/settings';
 import { useLive } from './db/useLive';
 import * as A from './lib/actions';
-import { deleteSeries, withRepeats } from './lib/repeat';
+import { deleteSeries, needsEditScope, withRepeats } from './lib/repeat';
 import { reorderTask, timeGroup } from './lib/reorder';
 import { useTaskDrag } from './lib/useTaskDrag';
 import type { Action, Changes } from './lib/changes';
@@ -208,10 +208,10 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
     { label: '刪除', color: RED, run: () => run(A.deleteNote(n, Date.now())) },
   ];
 
-  const save = () => {
+  const save = (editScope: EditorForm['editScope'] = 'one') => {
     if (!form) return;
     const existing = form.id ? tasks.find((t) => t.id === form.id) : undefined;
-    const action = A.saveForm(form, existing, Date.now(), newId(), tasks, newId());
+    const action = A.saveForm({ ...form, editScope }, existing, Date.now(), newId(), tasks, newId());
     if (!action) return;
     setForm(null);
     void run(action);
@@ -339,6 +339,7 @@ export default function App({ initialMissed = [], initialDay }: AppProps) {
           defaultLead={settings.leadMinutes}
           seriesFreq={(formP.shown.id && tasks.find((t) => t.id === formP.shown!.id)?.repeat?.freq) || null}
           origin={(formP.shown.id && tasks.find((t) => t.id === formP.shown!.id)) || null}
+          askEditScope={needsEditScope(formP.shown.id ? tasks.find((t) => t.id === formP.shown!.id) : undefined, formP.shown)}
           onChange={(patch) => setForm((f) => (f ? { ...f, ...patch } : f))}
           onCancel={() => setForm(null)}
           onSave={save}

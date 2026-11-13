@@ -29,16 +29,26 @@ const isStr = (v: unknown): v is string => typeof v === 'string';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isDate = (v: unknown): v is string => isStr(v) && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
+const isCat = (v: unknown) => v === '會議' || v === '待辦' || v === '私人';
+
+/** 重複事項的整組範本（沒有也可以，舊備份沒有） */
+function validTpl(v: unknown): boolean {
+  if (v === undefined) return true;
+  const o = v as Record<string, unknown>;
+  return !!o && typeof o === 'object' && isStr(o.title) && isStr(o.time) && isCat(o.category) && (o.leadMinutes === undefined || isNum(o.leadMinutes));
+}
+
 function validTask(t: unknown): t is Task {
   const o = t as Record<string, unknown>;
   return (
     !!o && typeof o === 'object' &&
     isStr(o.id) && o.id !== '' && isDate(o.date) && isStr(o.time) &&
-    (o.category === '會議' || o.category === '待辦' || o.category === '私人') &&
+    isCat(o.category) &&
     isStr(o.title) && isStr(o.note) && typeof o.done === 'boolean' &&
     isNum(o.delayDays) && isNum(o.createdAt) && isNum(o.updatedAt) &&
     (o.important === undefined || typeof o.important === 'boolean') &&
-    (o.order === undefined || isNum(o.order))
+    (o.order === undefined || isNum(o.order)) &&
+    (o.repeat === undefined || (!!o.repeat && typeof o.repeat === 'object' && validTpl((o.repeat as Record<string, unknown>).tpl)))
   );
 }
 function validNote(n: unknown): n is Note {

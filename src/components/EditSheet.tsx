@@ -6,7 +6,8 @@ import { usePresence } from '../lib/usePresence';
 import { CalendarSheet } from './CalendarSheet';
 import { TimeWheel } from './TimeWheel';
 import { Sheet } from './Sheet';
-import { ImportantScopeSheet } from './ImportantScopeSheet';
+import { ScopeSheet } from './ScopeSheet';
+import type { ImportantScope } from '../lib/editor';
 import type { RepeatFreq } from '../types';
 
 interface Props {
@@ -14,16 +15,17 @@ interface Props {
   closing: boolean;
   today: string;
   defaultLead: number; // 設定裡的預設提前分鐘
-  seriesFreq: RepeatFreq | null;
-  origin: RepeatOrigin; // 編輯中的事項原本的日期與重複設定（提示文字用同一個起始日） // 編輯的是已存在的重複事項時，它的頻率（切換「重要」要先問範圍）
+  seriesFreq: RepeatFreq | null; // 編輯的是已存在的重複事項時，它的頻率（切換「重要」要先問範圍）
+  origin: RepeatOrigin; // 編輯中的事項原本的日期與重複設定（提示文字用同一個起始日）
+  askEditScope: boolean; // 重複事項改了標題／時間／分類／提前提醒：按「儲存」時先問範圍
   onChange: (patch: Partial<EditorForm>) => void;
   onCancel: () => void;
-  onSave: () => void;
+  onSave: (editScope?: ImportantScope) => void;
 }
 
 const TIME_CHIPS: [TimeMode, string][] = [['', '不設'], ['上午', '上午'], ['下午', '下午'], ['pick', '指定']];
 
-export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origin, onChange, onCancel, onSave }: Props) {
+export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origin, askEditScope, onChange, onCancel, onSave }: Props) {
   const quick = quickDates(today);
   const isQuick = quick.includes(form.date);
   const [shake, setShake] = useState(false);
@@ -32,16 +34,18 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
   const pickP = usePresence(picking, 300);
   const [askImp, setAskImp] = useState(false); // 重複事項切換「重要」時的詢問框
   const askP = usePresence(askImp ? !form.important : null, 300); // 記住要切成什麼，關閉動畫時文字不變
+  const [askEdit, setAskEdit] = useState(false); // 重複事項改了內容，按「儲存」時的詢問框
+  const editP = usePresence(askEdit ? true : null, 300);
   const canSave = form.title.trim().length > 0;
   const isNew = form.mode === 'new';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !picking && !askImp) onCancel();
+      if (e.key === 'Escape' && !picking && !askImp && !askEdit) onCancel();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel, picking, askImp]);
+  }, [onCancel, picking, askImp, askEdit]);
 
   return (
     <>
@@ -195,7 +199,7 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
             aria-disabled={!canSave}
             onAnimationEnd={() => setShake(false)}
             onClick={() => {
-              if (canSave) return onSave();
+              if (canSave) return askEditScope && seriesFreq ? setAskEdit(true) : onSave();
               setShake(false);
               requestAnimationFrame(() => setShake(true));
               document.getElementById('ed-title')?.focus();
@@ -224,10 +228,11 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
       />
     )}
     {askP.shown !== null && seriesFreq && (
-      <ImportantScopeSheet
+      <ScopeSheet
+        heading={askP.shown ? '設為重要' : '取消重要'}
         title={form.title.trim() || '這件事'}
         freq={seriesFreq}
-        turnOn={askP.shown}
+        hint="「未來每一次」會改這一筆和之後還沒完成的每一筆。按「儲存」後才會生效。"
         closing={askP.closing}
         onCancel={() => setAskImp(false)}
         onOne={() => {
@@ -237,6 +242,24 @@ export function EditSheet({ form, closing, today, defaultLead, seriesFreq, origi
         onFuture={() => {
           onChange({ important: !form.important, importantScope: 'future' });
           setAskImp(false);
+        }}
+      />
+    )}
+    {editP.shown && seriesFreq && (
+      <ScopeSheet
+        heading="修改重複事項"
+        title={form.title.trim() || '這件事'}
+        freq={seriesFreq}
+        hint="「未來每一次」會改這一筆和之後還沒完成的每一筆（標題、時間、分類、提前提醒）；日期只改這一筆。"
+        closing={editP.closing}
+        onCancel={() => setAskEdit(false)}
+        onOne={() => {
+          setAskEdit(false);
+          onSave('one');
+        }}
+        onFuture={() => {
+          setAskEdit(false);
+          onSave('future');
         }}
       />
     )}

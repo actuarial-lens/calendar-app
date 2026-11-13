@@ -13,6 +13,15 @@ export interface Repeat {
   occurrence: string; // 這一筆原本屬於哪一天（被延後、改日期都不會變）
   until?: string; // 結束日期（含當天）；沒有就是不結束
   important?: boolean; // 這組之後新排出來的每一筆要不要標「重要」（「未來每一次」時設定）
+  /** 之後新排出來的每一筆用的標題、時間、分類、提前提醒；舊資料沒有時看原定日期最晚的那一筆 */
+  tpl?: SeriesTpl;
+}
+
+export interface SeriesTpl {
+  title: string;
+  time: TimeValue;
+  category: Category;
+  leadMinutes?: number;
 }
 
 export interface Task {

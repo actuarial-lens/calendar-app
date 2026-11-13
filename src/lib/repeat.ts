@@ -2,7 +2,8 @@ import type { Action, Changes } from './changes';
 import { emptyChanges } from './changes';
 import { addDays, parseISO, pad2 } from './dates';
 import type { EditorForm } from './editor';
-import type { Repeat, RepeatFreq, Task } from '../types';
+import { formTime } from './editor';
+import type { Category, Repeat, RepeatFreq, SeriesTpl, Task, TimeValue } from '../types';
 
 /** 一次最多往後排到幾天之後；每週約 9 筆、每月約 2 筆 */
 export const REPEAT_HORIZON_DAYS = 60;
@@ -60,8 +61,10 @@ export function planRepeats(tasks: Task[], today: string, now: number, newId: ()
   }
   const horizon = addDays(today, REPEAT_HORIZON_DAYS);
   const added: Task[] = [];
-  for (const tpl of latest.values()) {
-    const r = tpl.repeat!;
+  for (const last of latest.values()) {
+    const r = last.repeat!;
+    // 整組的設定存在 repeat.tpl；舊資料沒有才看最後一筆
+    const tpl = r.tpl ?? tplOf(last);
     const after = r.occurrence > addDays(today, -1) ? r.occurrence : addDays(today, -1);
     for (const d of occurrenceDates(r.anchor, r.freq, after, horizon, r.until)) {
       added.push({
@@ -70,7 +73,7 @@ export function planRepeats(tasks: Task[], today: string, now: number, newId: ()
         time: tpl.time,
         category: tpl.category,
         title: tpl.title,
-        note: tpl.note,
+        note: last.note,
         ...(tpl.leadMinutes !== undefined ? { leadMinutes: tpl.leadMinutes } : {}),
         // 「重要」看整組的設定，不看範本那一筆（範本可能是「僅限這次」改過的）
         ...(r.important ? { important: true } : {}),
@@ -175,18 +178,89 @@ export function setImportant<T extends { important?: boolean }>(x: T, important:
   return (important ? { ...rest, important: true } : rest) as T;
 }
 
+/** 一筆事項的標題、時間、分類、提前提醒 → 整組的範本 */
+export function tplOf(t: Pick<Task, 'title' | 'time' | 'category' | 'leadMinutes'>): SeriesTpl {
+  return { title: t.title, time: t.time, category: t.category, ...(t.leadMinutes !== undefined ? { leadMinutes: t.leadMinutes } : {}) };
+}
+
+/** 整組目前的範本：有存就用存的；舊資料沒有就和 planRepeats 一樣看原定日期最晚的那一筆 */
+export function currentTpl(all: Task[], t: Task): SeriesTpl {
+  if (t.repeat?.tpl) return t.repeat.tpl;
+  let last = t;
+  for (const x of all) if (x.repeat?.seriesId === t.repeat?.seriesId && x.repeat!.occurrence > last.repeat!.occurrence) last = x;
+  return last.repeat?.tpl ?? tplOf(last);
+}
+
+/** 編輯面板上改了哪些整組可共用的欄位（只放有改的；lead: null = 改回跟隨預設） */
+export interface TplPatch {
+  title?: string;
+  time?: TimeValue;
+  category?: Category;
+  lead?: number | null;
+}
+
+export function tplPatch(existing: Task, form: EditorForm): TplPatch {
+  const p: TplPatch = {};
+  const title = form.title.trim();
+  const time = formTime(form);
+  if (title && title !== existing.title) p.title = title;
+  if (time !== existing.time) p.time = time;
+  if (form.category !== existing.category) p.category = form.category;
+  if (form.lead !== (existing.leadMinutes ?? null)) p.lead = form.lead;
+  return p;
+}
+
+export const isEmptyPatch = (p: TplPatch) => Object.keys(p).length === 0;
+
+/** 存檔前要不要問「僅限這次／未來每一次」：已存在的重複事項、沒改重複設定、改了標題／時間／分類／提前提醒 */
+export function needsEditScope(existing: Task | undefined, form: EditorForm): boolean {
+  if (!existing?.repeat || form.mode !== 'edit') return false;
+  if (repeatChanged(existing, form)) return false;
+  return !isEmptyPatch(tplPatch(existing, form));
+}
+
+/** 把改動套到一筆事項或範本上（時間改了，手動排的順序也拿掉） */
+export function applyPatch<T extends Task | SeriesTpl>(x: T, p: TplPatch): T {
+  let out = { ...x } as T & { order?: number };
+  if (p.title !== undefined) out.title = p.title;
+  if (p.category !== undefined) out.category = p.category;
+  if (p.time !== undefined && p.time !== out.time) {
+    out.time = p.time;
+    delete out.order;
+  }
+  if (p.lead !== undefined) {
+    const { leadMinutes: _l, ...rest } = out;
+    out = (p.lead === null ? rest : { ...rest, leadMinutes: p.lead }) as T;
+  }
+  return out;
+}
+
 /**
  * 「未來每一次」：同一組裡原定日期在 t 之後的每一筆，整組設定都改掉（之後新排的會跟著），
- * 其中還沒完成、沒被刪掉的那些，卡片上的「重要」也一起改。t 自己不在回傳裡。
+ * 其中還沒完成、沒被刪掉的那些，卡片內容也一起改。t 自己不在回傳裡。
+ * important：要改「重要」時給；patch + tpl：要改標題／時間／分類／提前提醒時給（tpl 是改完的整組範本）。
  */
-export function importantForFuture(all: Task[], t: Task, important: boolean, now: number): Task[] {
+export function editFuture(all: Task[], t: Task, opts: { important?: boolean; patch?: TplPatch; tpl?: SeriesTpl }, now: number): Task[] {
   const r = t.repeat!;
   const out: Task[] = [];
   for (const x of all) {
     if (x.repeat?.seriesId !== r.seriesId || x.id === t.id || x.repeat.occurrence < r.occurrence) continue;
     const live = !x.done && !x.deletedAt;
-    const next = { ...(live ? setImportant(x, important) : x), repeat: setImportant(x.repeat, important), updatedAt: now };
-    out.push(next);
+    let next: Task = x;
+    let rep: Repeat = x.repeat;
+    if (opts.important !== undefined) {
+      if (live) next = setImportant(next, opts.important);
+      rep = setImportant(rep, opts.important);
+    }
+    if (opts.patch && opts.tpl) {
+      if (live) next = applyPatch(next, opts.patch);
+      rep = { ...rep, tpl: opts.tpl };
+    }
+    out.push({ ...next, repeat: rep, updatedAt: now });
   }
   return out;
+}
+
+export function importantForFuture(all: Task[], t: Task, important: boolean, now: number): Task[] {
+  return editFuture(all, t, { important }, now);
 }

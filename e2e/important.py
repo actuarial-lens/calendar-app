@@ -15,7 +15,7 @@ async def main():
         await page.locator('.btn-new').click(); await page.wait_for_selector('.sheet'); await page.wait_for_timeout(500)
         await page.fill('#ed-title','一般重要')
         await imp.click(); await page.wait_for_timeout(200)
-        print('一般：跳框?', await page.locator('#imp-title').count(), '| 按下?', await imp.get_attribute('aria-pressed'))
+        print('一般：跳框?', await page.locator('#scope-title').count(), '| 按下?', await imp.get_attribute('aria-pressed'))
         await page.locator('.btn-primary').click(); await page.wait_for_timeout(700)
         card = page.locator('.card', has_text='一般重要')
         print('卡片:', await card.locator('.row1 .left').inner_text(), '| 顏色:', await card.locator('.imp').evaluate("e=>getComputedStyle(e).color"))
@@ -29,13 +29,13 @@ async def main():
 
         # 3. 打開，點重要 -> 跳框；按取消 -> 維持原狀
         await page.locator('.card', has_text='週會').click(); await page.wait_for_selector('#ed-title'); await page.wait_for_timeout(500)
-        await imp.click(); await page.wait_for_selector('#imp-title'); await page.wait_for_timeout(400)
-        print('詢問框:', await page.locator('#imp-title').inner_text(), await page.locator('.del-actions button').all_inner_texts())
+        await imp.click(); await page.wait_for_selector('#scope-title'); await page.wait_for_timeout(400)
+        print('詢問框:', await page.locator('#scope-title').inner_text(), await page.locator('.del-actions button').all_inner_texts())
         await page.locator('.del-actions .btn-text', has_text='取消').click(); await page.wait_for_timeout(500)
         print('取消後 按下?', await imp.get_attribute('aria-pressed'), '| 編輯面板還在?', await page.locator('#ed-title').count())
 
         # 4. 點重要 -> 未來每一次，但編輯面板按取消 -> 不生效
-        await imp.click(); await page.wait_for_selector('#imp-title'); await page.wait_for_timeout(400)
+        await imp.click(); await page.wait_for_selector('#scope-title'); await page.wait_for_timeout(400)
         await page.locator('.del-actions button', has_text='未來每一次').click(); await page.wait_for_timeout(500)
         print('選完 按下?', await imp.get_attribute('aria-pressed'))
         await page.locator('.sheet-actions .btn-ghost', has_text='取消').click(); await page.wait_for_timeout(600)
@@ -43,7 +43,7 @@ async def main():
 
         # 5. 再來一次，未來每一次 + 儲存
         await page.locator('.card', has_text='週會').click(); await page.wait_for_selector('#ed-title'); await page.wait_for_timeout(500)
-        await imp.click(); await page.wait_for_selector('#imp-title'); await page.wait_for_timeout(400)
+        await imp.click(); await page.wait_for_selector('#scope-title'); await page.wait_for_timeout(400)
         await page.locator('.del-actions button', has_text='未來每一次').click(); await page.wait_for_timeout(500)
         await page.locator('.btn-primary').click(); await page.wait_for_timeout(700)
         print('未來每一次:', await page.evaluate(DB, '週會'))
@@ -51,8 +51,8 @@ async def main():
 
         # 6. 取消重要 -> 僅限這次
         await page.locator('.card', has_text='週會').click(); await page.wait_for_selector('#ed-title'); await page.wait_for_timeout(500)
-        await imp.click(); await page.wait_for_selector('#imp-title'); await page.wait_for_timeout(400)
-        print('詢問框:', await page.locator('#imp-title').inner_text())
+        await imp.click(); await page.wait_for_selector('#scope-title'); await page.wait_for_timeout(400)
+        print('詢問框:', await page.locator('#scope-title').inner_text())
         await page.locator('.del-actions button', has_text='僅限這次').click(); await page.wait_for_timeout(500)
         await page.locator('.btn-primary').click(); await page.wait_for_timeout(700)
         print('僅限這次取消:', await page.evaluate(DB, '週會'))
